@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"sdshttp/util"
@@ -14,6 +15,9 @@ import (
 
 	"golang.org/x/crypto/scrypt"
 )
+
+//Almacenamiento de datos
+var usuariosRegistrados []user
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -32,6 +36,13 @@ type user struct {
 	Data  map[string]string // datos adicionales del usuario
 }
 
+type User1 struct {
+	Nombre   string `json:"nombre"`
+	Username string `json:"userName"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
@@ -41,6 +52,9 @@ func Run() {
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
 
 	http.HandleFunc("/", handler) // asignamos un handler global
+
+	//Mis llamadas
+	http.HandleFunc("/register", registro)
 
 	// escuchamos el puerto 10443 con https y comprobamos el error
 	chk(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
@@ -118,6 +132,14 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		gUsers[u.Name] = u
 		response(w, true, string(datos), u.Token)
 
+	case "prueba":
+		fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
+		fmt.Printf("\n - Password: %q", req.Form.Get("pass"))
+		fmt.Printf("\n - Email Codificado: %q", req.Form.Get("email"))
+		fmt.Printf("\n - Email Decodificado: %q", util.Decode64(req.Form.Get("email")))
+
+		response(w, true, string("Te has registrado correctamente"), nil)
+
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
@@ -139,4 +161,14 @@ func response(w io.Writer, ok bool, msg string, token []byte) {
 	rJSON, err := json.Marshal(&r)            // codificamos en JSON
 	chk(err)                                  // comprobamos error
 	w.Write(rJSON)                            // escribimos el JSON resultante
+}
+
+//Mis llamadas
+func registro(w http.ResponseWriter, req *http.Request) {
+
+	var usuario User1
+	json.NewDecoder(req.Body).Decode(&usuario)
+
+	fmt.Printf("\nNombre Usuario: %q", usuario.Nombre)
+
 }

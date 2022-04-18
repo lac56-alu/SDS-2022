@@ -50,7 +50,7 @@ func login() {
 	fmt.Printf("\nContraseña: %q", pass)
 }
 
-func registro(client *http.Client) {
+func registro(client *http.Client) bool {
 	var usuario User = User{}
 
 	fmt.Print("Nombre: ")
@@ -99,11 +99,38 @@ func registro(client *http.Client) {
 	}
 
 	respuestaServidor, errorServidor := client.Post("http://localhost:10443/register", "application/json; charset=utf-8", bytes.NewBuffer(jsonEnviar))
+	*/
 
-	if errorServidor != nil {
+	data := url.Values{} // estructura para contener los valores
+	data.Set("cmd", "prueba")
+	data.Set("nombre", usuario.Username)
+	data.Set("pass", usuario.Password)
+	data.Set("email", util.Encode64([]byte(usuario.Email)))
+
+	fmt.Println("\n --------------------------------- MIOOOOOOOOOOOOOOO -------------------------------------- \n")
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
+	r.Body.Close()             // hay que cerrar el reader del body
+	fmt.Println()
+
+	fmt.Println("\n --------------------------------------------------------------------------------------- \n")
+
+	/*if errorServidor != nil {
 		panic("\n¡ERROR SERVIDOR RESPUESTA!")
 	}*/
 
+	defer respuestaServidor.Body.Close()
+	bodyBytes, _ := ioutil.ReadAll(respuestaServidor.Body)
+
+	bodyString := string(bodyBytes)
+
+	if bodyString == "Registrado correctamente" {
+		return true
+	}
+	//fmt.Println(bodyString)
+	*/
+	return false
 }
 
 func menuInicio(client *http.Client) {
@@ -135,6 +162,8 @@ func Run() {
 	client := &http.Client{Transport: tr}
 
 	menuInicio(client)
+
+	fmt.Println("\n --------------------------------------------------------------------------------------- \n")
 
 	// hash con SHA512 de la contraseña
 	keyClient := sha512.Sum512([]byte("contraseña del cliente"))

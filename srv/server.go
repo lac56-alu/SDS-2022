@@ -76,6 +76,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		gUsers[u.Name] = u
 		response(w, true, "Usuario registrado", u.Token)
+		println(u.Name)
 
 	case "login": // ** login
 		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?

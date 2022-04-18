@@ -4,7 +4,6 @@ Cliente
 package cli
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
@@ -37,11 +36,11 @@ type User struct {
 }
 
 func login() {
-	fmt.Println("Username: ")
+	fmt.Print("Username: ")
 	var usernameLogin string
 	fmt.Scanln(&usernameLogin)
 
-	fmt.Println("\nContraseña: ")
+	fmt.Print("\nContraseña: ")
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 
 	if err != nil {
@@ -54,13 +53,13 @@ func login() {
 func registro(client *http.Client) {
 	var usuario User = User{}
 
-	fmt.Println("Nombre: ")
+	fmt.Print("Nombre: ")
 	fmt.Scanln(&usuario.Nombre)
 
-	fmt.Println("Username: ")
+	fmt.Print("Username: ")
 	fmt.Scanln(&usuario.Username)
 
-	fmt.Println("Email: ")
+	fmt.Print("Email: ")
 	fmt.Scanln(&usuario.Email)
 
 	var passwordRegister string
@@ -94,7 +93,7 @@ func registro(client *http.Client) {
 
 	fmt.Printf("\nContraseña: %q", pass)
 
-	jsonEnviar, errJSON := json.Marshal(usuario)
+	/*jsonEnviar, errJSON := json.Marshal(usuario)
 	if errJSON != nil {
 		panic("\n¡ERROR CIFRAR JSON!")
 	}
@@ -103,13 +102,14 @@ func registro(client *http.Client) {
 
 	if errorServidor != nil {
 		panic("\n¡ERROR SERVIDOR RESPUESTA!")
-	}
+	}*/
 
 }
 
 func menuInicio(client *http.Client) {
 	fmt.Println(" 1. Login")
-	fmt.Println(" 2. Registro\n")
+	fmt.Println(" 2. Registro")
+	fmt.Print("Opcion: ")
 
 	var eleccion int
 	fmt.Scanln(&eleccion)

@@ -169,8 +169,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		//u.Data["keyData"] = keyDataRegistro
 		password := util.Decode64(passRegistro) // contraseña (keyLogin)
 
-		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-		u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+		// Argon2
+		u.Hash = argon2.IDKey([]byte(password), u.Salt, 16384, 8, 1, 32)
 
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)

@@ -13,6 +13,7 @@ import (
 	"sdshttp/util"
 	"time"
 
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -83,8 +84,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Data["public"] = req.Form.Get("pubkey")       // clave pública
 		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
 
-		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-		u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+		//argon2
+		u.Hash = argon2.IDKey([]byte(password), u.Salt, 16384, 8, 1, 32)
 
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
@@ -177,7 +178,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		gUsers[u.Username] = u
 
-		response(w, true, string("Te has registrado correctamente"), nil)
+		response(w, true, string("Te has registrado correctamente"), u.Token)
 
 	default:
 		response(w, false, "Comando no implementado", nil)

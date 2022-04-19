@@ -29,10 +29,13 @@ func chk(e error) {
 }
 
 type User struct {
-	Nombre   string `json:"nombre"`
-	Username string `json:"userName"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Nombre     string `json:"nombre"`
+	Username   string `json:"userName"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	keyData    string `json:"keyData"`
+	publicKey  string `json:"publicKey"`
+	privateKey string `json:"privateKey"`
 }
 
 func login() {
@@ -87,25 +90,47 @@ func registro(client *http.Client) bool {
 	}
 
 	hash := sha512.Sum512([]byte(passwordRegister))
-	pass := hash[:32] // una mitad para el login (256 bits)
-	//keyData := hash[32:64] // la otra para los datos (256 bits)
+	pass := hash[:32]      // una mitad para el login (256 bits)
+	keyData := hash[32:64] // la otra para los datos (256 bits)
 	usuario.Password = util.Encode64(pass)
 
-	fmt.Printf("\nContraseña: %q", pass)
+	pkClient, err := rsa.GenerateKey(rand.Reader, 1024)
+	chk(err)
+	pkClient.Precompute() // aceleramos su uso con un precálculo
 
-	/*jsonEnviar, errJSON := json.Marshal(usuario)
-	if errJSON != nil {
-		panic("\n¡ERROR CIFRAR JSON!")
-	}
+	pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
+	chk(err)
 
-	respuestaServidor, errorServidor := client.Post("http://localhost:10443/register", "application/json; charset=utf-8", bytes.NewBuffer(jsonEnviar))
+	keyPub := pkClient.Public()           // extraemos la clave pública por separado
+	pubJSON, err := json.Marshal(&keyPub) // y codificamos con JSON
+	chk(err)
+
+	// comprimimos y codificamos la clave pública
+	usuario.publicKey = util.Encode64(util.Compress(pubJSON))
+	usuario.privateKey = util.Encode64(util.Encrypt(util.Compress(pkJSON), keyData))
+
+	usuario.keyData = util.Encode64(keyData)
+
+	/*
+		fmt.Printf("\nContraseña: %q", pass)
+
+		jsonEnviar, errJSON := json.Marshal(usuario)
+		if errJSON != nil {
+			panic("\n¡ERROR CIFRAR JSON!")
+		}
+
+		respuestaServidor, errorServidor := client.Post("http://localhost:10443/register", "application/json; charset=utf-8", bytes.NewBuffer(jsonEnviar))
 	*/
 
 	data := url.Values{} // estructura para contener los valores
 	data.Set("cmd", "prueba")
-	data.Set("nombre", usuario.Username)
+	data.Set("nombre", util.Encode64([]byte(usuario.Nombre)))
+	data.Set("username", util.Encode64([]byte(usuario.Username)))
 	data.Set("pass", usuario.Password)
 	data.Set("email", util.Encode64([]byte(usuario.Email)))
+	data.Set("keyData", usuario.keyData)
+	data.Set("publicKey", usuario.publicKey)
+	data.Set("privateKey", usuario.privateKey)
 
 	fmt.Println("\n --------------------------------- MIOOOOOOOOOOOOOOO -------------------------------------- \n")
 

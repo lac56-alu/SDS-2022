@@ -128,7 +128,7 @@ func registro(client *http.Client) bool {
 	data.Set("username", util.Encode64([]byte(usuario.Username)))
 	data.Set("pass", usuario.Password)
 	data.Set("email", util.Encode64([]byte(usuario.Email)))
-	data.Set("keyData", usuario.keyData)
+	//data.Set("keyData", usuario.keyData)
 	data.Set("publicKey", usuario.publicKey)
 	data.Set("privateKey", usuario.privateKey)
 
@@ -264,4 +264,5 @@ func Run() {
 	r.Body.Close()             // hay que cerrar el reader del body
 	fmt.Println()
 
+	menuInicio(client)
 }

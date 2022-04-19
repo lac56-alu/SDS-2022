@@ -17,7 +17,7 @@ import (
 )
 
 //Almacenamiento de datos
-var usuariosRegistrados []user
+var usuariosRegistrados map[string]user
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -28,12 +28,14 @@ func chk(e error) {
 
 // ejemplo de tipo para un usuario
 type user struct {
-	Name  string            // nombre de usuario
-	Hash  []byte            // hash de la contraseña
-	Salt  []byte            // sal para la contraseña
-	Token []byte            // token de sesión
-	Seen  time.Time         // última vez que fue visto
-	Data  map[string]string // datos adicionales del usuario
+	Name     string            // nombre de usuario
+	Username string            // nick del usuario
+	Email    string            // email de usuario
+	Hash     []byte            // hash de la contraseña
+	Salt     []byte            // sal para la contraseña
+	Token    []byte            // token de sesión
+	Seen     time.Time         // última vez que fue visto
+	Data     map[string]string // datos adicionales del usuario
 }
 
 type User1 struct {
@@ -133,10 +135,47 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, string(datos), u.Token)
 
 	case "prueba":
-		fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
-		fmt.Printf("\n - Password: %q", req.Form.Get("pass"))
-		fmt.Printf("\n - Email Codificado: %q", req.Form.Get("email"))
-		fmt.Printf("\n - Email Decodificado: %q", util.Decode64(req.Form.Get("email")))
+		/*
+			fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
+			fmt.Printf("\n - Password: %q", req.Form.Get("pass"))
+			fmt.Printf("\n - Email Codificado: %q", req.Form.Get("email"))
+			fmt.Printf("\n - Email Decodificado: %q", util.Decode64(req.Form.Get("email")))
+		*/
+
+		nombreRegistro := req.Form.Get("nombre")
+		usernameRegistro := req.Form.Get("username")
+		passRegistro := req.Form.Get("pass")
+		emailRegistro := req.Form.Get("email")
+		//keyDataRegistro := req.Form.Get("keyData")
+		publicKeyRegistro := req.Form.Get("publicKey")
+		privateKeyRegistro := req.Form.Get("privateKey")
+
+		_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
+		if ok {
+			response(w, false, "Usuario ya registrado", nil)
+			return
+		}
+
+		u := user{}
+		u.Name = nombreRegistro
+		u.Email = emailRegistro
+		u.Username = usernameRegistro
+		u.Salt = make([]byte, 16)              // sal (16 bytes == 128 bits)
+		rand.Read(u.Salt)                      // la sal es aleatoria
+		u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
+		u.Data["private"] = privateKeyRegistro // clave privada
+		u.Data["public"] = publicKeyRegistro   // clave pública
+		//u.Data["keyData"] = keyDataRegistro
+		password := util.Decode64(passRegistro) // contraseña (keyLogin)
+
+		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
+		u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+
+		u.Seen = time.Now()        // asignamos tiempo de login
+		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
+		rand.Read(u.Token)         // el token es aleatorio
+
+		gUsers[u.Username] = u
 
 		response(w, true, string("Te has registrado correctamente"), nil)
 

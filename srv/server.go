@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sdshttp/util"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 )
 
 //Almacenamiento de datos
-var usuariosRegistrados map[string]user
+//var usuariosRegistrados []user
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -39,12 +40,12 @@ type user struct {
 	Data     map[string]string // datos adicionales del usuario
 }
 
-type User1 struct {
+/*type User1 struct {
 	Nombre   string `json:"nombre"`
 	Username string `json:"userName"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
-}
+}*/
 
 type respuestaServer struct {
 	Ok    string `json:"Ok"`
@@ -64,6 +65,7 @@ func Run() {
 
 	//Mis llamadas
 	http.HandleFunc("/register", registro)
+	//http.HandleFunc("/login", login)
 
 	// escuchamos el puerto 10443 con https y comprobamos el error
 	chk(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
@@ -75,9 +77,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
 	case "register": // ** registro
-		_, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		_, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
 		if ok {
-			response(w, false, "Usuario ya registrado", nil)
+			//response(w, false, "Usuario ya registrado", nil)
+			w.WriteHeader(201)
 			return
 		}
 
@@ -101,23 +104,25 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, "Usuario registrado", u.Token)
 
 	case "login": // ** login
-		u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
 		if !ok {
-			response(w, false, "Usuario inexistente", nil)
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
 			return
-		}
-
-		password := util.Decode64(req.Form.Get("pass"))          // obtenemos la contraseña (keyLogin)
-		hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
-		if !bytes.Equal(u.Hash, hash) {                          // comparamos
-			response(w, false, "Credenciales inválidas", nil)
-
 		} else {
-			u.Seen = time.Now()        // asignamos tiempo de login
-			u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
-			rand.Read(u.Token)         // el token es aleatorio
-			gUsers[u.Name] = u
-			response(w, true, "Credenciales válidas", u.Token)
+			password := util.Decode64(req.Form.Get("pass"))          // obtenemos la contraseña (keyLogin)
+			hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
+			if !bytes.Equal(u.Hash, hash) {                          // comparamos
+				//response(w, false, "Credenciales inválidas", nil)
+				w.WriteHeader(203)
+			} else {
+				u.Seen = time.Now()        // asignamos tiempo de login
+				u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
+				rand.Read(u.Token)         // el token es aleatorio
+				gUsers[u.Name] = u
+				//response(w, true, "Credenciales válidas", u.Token)
+				w.WriteHeader(200)
+			}
 		}
 
 	case "data": // ** obtener datos de usuario
@@ -189,6 +194,33 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		//w.Header().Set("Authoritation", util.Encode64([]byte(u.Token)))
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
+	case "create":
+		u, ok := gUsers[req.Form.Get("username")] // ¿existe ya el usuario?
+		if !ok {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+			texto := req.Form.Get("Texto")
+			nom := req.Form.Get("NombreFichero")
+			fmt.Println(u.Name)
+			path := "C:\\Users\\Adel\\Desktop\\2122\\SDS\\ficheros\\" + u.Name
+			_, erro := os.Stat(path)
+			if os.IsNotExist(erro) {
+				erro = os.Mkdir(path, 0755)
+			}
+			f, err := os.Create(path + "\\" + nom + ".txt")
+			if err != nil {
+				w.WriteHeader(201)
+				return
+			} else {
+				fmt.Fprintln(f, texto)
+				f.Close()
+				w.WriteHeader(200)
+			}
+		}
+	case "lectura":
+
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
@@ -216,9 +248,9 @@ func response(w io.Writer, ok bool, msg string, token []byte) {
 //Mis llamadas
 func registro(w http.ResponseWriter, req *http.Request) {
 
-	var usuario User1
+	/*var usuario User1
 	json.NewDecoder(req.Body).Decode(&usuario)
 
 	fmt.Printf("\nNombre Usuario: %q", usuario.Nombre)
-
+	*/
 }

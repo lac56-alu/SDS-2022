@@ -3,7 +3,7 @@ module sdshttp
 go 1.17
 
 require (
-	golang.org/x/crypto v0.0.0-20220312131142-6068a2e6cfdc
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
 )
 

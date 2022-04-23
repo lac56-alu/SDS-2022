@@ -13,11 +13,12 @@ import (
 	"sdshttp/util"
 	"time"
 
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/scrypt"
 )
 
 //Almacenamiento de datos
-var usuariosRegistrados []user
+var usuariosRegistrados map[string]user
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -28,12 +29,14 @@ func chk(e error) {
 
 // ejemplo de tipo para un usuario
 type user struct {
-	Name  string            // nombre de usuario
-	Hash  []byte            // hash de la contraseña
-	Salt  []byte            // sal para la contraseña
-	Token []byte            // token de sesión
-	Seen  time.Time         // última vez que fue visto
-	Data  map[string]string // datos adicionales del usuario
+	Name     string            // nombre de usuario
+	Username string            // nick del usuario
+	Email    string            // email de usuario
+	Hash     []byte            // hash de la contraseña
+	Salt     []byte            // sal para la contraseña
+	Token    []byte            // token de sesión
+	Seen     time.Time         // última vez que fue visto
+	Data     map[string]string // datos adicionales del usuario
 }
 
 type User1 struct {
@@ -41,6 +44,12 @@ type User1 struct {
 	Username string `json:"userName"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type respuestaServer struct {
+	Ok    string `json:"Ok"`
+	Msg   string `json:"Msg"`
+	Token string `json:"token"`
 }
 
 // mapa con todos los usuarios
@@ -61,8 +70,8 @@ func Run() {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	req.ParseForm()                              // es necesario parsear el formulario
-	w.Header().Set("Content-Type", "text/plain") // cabecera estándar
+	req.ParseForm()                                                   // es necesario parsear el formulario
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8") // cabecera estándar
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
 	case "register": // ** registro
@@ -81,8 +90,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Data["public"] = req.Form.Get("pubkey")       // clave pública
 		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
 
-		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-		u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+		//argon2
+		u.Hash = argon2.IDKey([]byte(password), u.Salt, 16384, 8, 1, 32)
 
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
@@ -133,12 +142,52 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, string(datos), u.Token)
 
 	case "prueba":
-		fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
-		fmt.Printf("\n - Password: %q", req.Form.Get("pass"))
-		fmt.Printf("\n - Email Codificado: %q", req.Form.Get("email"))
-		fmt.Printf("\n - Email Decodificado: %q", util.Decode64(req.Form.Get("email")))
+		/*
+			fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
+			fmt.Printf("\n - Password: %q", req.Form.Get("pass"))
+			fmt.Printf("\n - Email Codificado: %q", req.Form.Get("email"))
+			fmt.Printf("\n - Email Decodificado: %q", util.Decode64(req.Form.Get("email")))
+		*/
 
-		response(w, true, string("Te has registrado correctamente"), nil)
+		nombreRegistro := req.Form.Get("nombre")
+		usernameRegistro := req.Form.Get("username")
+		passRegistro := req.Form.Get("pass")
+		emailRegistro := req.Form.Get("email")
+		//keyDataRegistro := req.Form.Get("keyData")
+		publicKeyRegistro := req.Form.Get("publicKey")
+		privateKeyRegistro := req.Form.Get("privateKey")
+
+		_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
+		if ok {
+			w.WriteHeader(400)
+			response(w, false, "Usuario ya registrado", nil)
+			return
+		}
+
+		u := user{}
+		u.Name = nombreRegistro
+		u.Email = emailRegistro
+		u.Username = usernameRegistro
+		u.Salt = make([]byte, 16)              // sal (16 bytes == 128 bits)
+		rand.Read(u.Salt)                      // la sal es aleatoria
+		u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
+		u.Data["private"] = privateKeyRegistro // clave privada
+		u.Data["public"] = publicKeyRegistro   // clave pública
+		//u.Data["keyData"] = keyDataRegistro
+		password := util.Decode64(passRegistro) // contraseña (keyLogin)
+
+		// Argon2
+		u.Hash = argon2.IDKey([]byte(password), u.Salt, 16384, 8, 1, 32)
+
+		u.Seen = time.Now()        // asignamos tiempo de login
+		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
+		rand.Read(u.Token)         // el token es aleatorio
+		//fmt.Printf("\n Token: %q", u.Token)
+
+		gUsers[u.Username] = u
+		w.WriteHeader(200)
+		//w.Header().Set("Authoritation", util.Encode64([]byte(u.Token)))
+		response(w, true, string("Te has registrado correctamente"), u.Token)
 
 	default:
 		response(w, false, "Comando no implementado", nil)
@@ -158,9 +207,10 @@ type Resp struct {
 // función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
-	rJSON, err := json.Marshal(&r)            // codificamos en JSON
-	chk(err)                                  // comprobamos error
-	w.Write(rJSON)                            // escribimos el JSON resultante
+	fmt.Printf("\n Token: %q", token)
+	rJSON, err := json.Marshal(&r) // codificamos en JSON
+	chk(err)                       // comprobamos error
+	w.Write(rJSON)                 // escribimos el JSON resultante
 }
 
 //Mis llamadas

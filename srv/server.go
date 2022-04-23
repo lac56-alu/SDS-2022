@@ -46,6 +46,12 @@ type User1 struct {
 	Password string `json:"password"`
 }
 
+type respuestaServer struct {
+	Ok    string `json:"Ok"`
+	Msg   string `json:"Msg"`
+	Token string `json:"token"`
+}
+
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
@@ -64,8 +70,8 @@ func Run() {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	req.ParseForm()                              // es necesario parsear el formulario
-	w.Header().Set("Content-Type", "text/plain") // cabecera estándar
+	req.ParseForm()                                                   // es necesario parsear el formulario
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8") // cabecera estándar
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
 	case "register": // ** registro
@@ -153,6 +159,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
 		if ok {
+			w.WriteHeader(400)
 			response(w, false, "Usuario ya registrado", nil)
 			return
 		}
@@ -175,9 +182,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
+		//fmt.Printf("\n Token: %q", u.Token)
 
 		gUsers[u.Username] = u
-
+		w.WriteHeader(200)
+		//w.Header().Set("Authoritation", util.Encode64([]byte(u.Token)))
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
 	default:
@@ -198,9 +207,10 @@ type Resp struct {
 // función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
-	rJSON, err := json.Marshal(&r)            // codificamos en JSON
-	chk(err)                                  // comprobamos error
-	w.Write(rJSON)                            // escribimos el JSON resultante
+	fmt.Printf("\n Token: %q", token)
+	rJSON, err := json.Marshal(&r) // codificamos en JSON
+	chk(err)                       // comprobamos error
+	w.Write(rJSON)                 // escribimos el JSON resultante
 }
 
 //Mis llamadas

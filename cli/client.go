@@ -10,10 +10,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"sdshttp/srv"
 	"sdshttp/util"
 	"syscall"
@@ -134,27 +132,35 @@ func registro(client *http.Client) bool {
 
 	fmt.Println("\n --------------------------------- MIOOOOOOOOOOOOOOO -------------------------------------- \n")
 
-	r, _ := client.PostForm("https://localhost:10443", data)
-	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-	r.Body.Close()             // hay que cerrar el reader del body
-	fmt.Println()
+	r, errorServidor := client.PostForm("https://localhost:10443", data)
+	//io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
+
+	//tokenUsuario := util.Decode64(r.Header.Get("Authoritation"))
+
+	respuesta := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&respuesta)
+	//fmt.Println()
 
 	fmt.Println("\n --------------------------------------------------------------------------------------- \n")
 
-	/*if errorServidor != nil {
+	if errorServidor != nil {
 		panic("\n¡ERROR SERVIDOR RESPUESTA!")
 	}
 
-	defer respuestaServidor.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(respuestaServidor.Body)
+	//defer r.Body.Close()
 
-	bodyString := string(bodyBytes)
+	if r.StatusCode == 400 {
+		fmt.Println("\n ALGO SALIÓ MAL.... \n")
+		return false
+	}
 
-	if bodyString == "Registrado correctamente" {
+	if r.StatusCode == 200 {
+		fmt.Println("\n ¡TE HAS REGISTRADO DE FORMA CORRECTA! \n")
+		fmt.Printf("\n Token: %q", respuesta.Token)
 		return true
 	}
 	//fmt.Println(bodyString)
-	*/
+	r.Body.Close() // hay que cerrar el reader del body
 	return false
 }
 
@@ -188,81 +194,81 @@ func Run() {
 	menuInicio(client)
 
 	fmt.Println("\n --------------------------------------------------------------------------------------- \n")
+	/*
+		// hash con SHA512 de la contraseña
+		keyClient := sha512.Sum512([]byte("contraseña del cliente"))
+		keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
+		keyData := keyClient[32:64] // la otra para los datos (256 bits)
 
-	// hash con SHA512 de la contraseña
-	keyClient := sha512.Sum512([]byte("contraseña del cliente"))
-	keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
-	keyData := keyClient[32:64] // la otra para los datos (256 bits)
+		// generamos un par de claves (privada, pública) para el servidor
+		pkClient, err := rsa.GenerateKey(rand.Reader, 1024)
+		chk(err)
+		pkClient.Precompute() // aceleramos su uso con un precálculo
 
-	// generamos un par de claves (privada, pública) para el servidor
-	pkClient, err := rsa.GenerateKey(rand.Reader, 1024)
-	chk(err)
-	pkClient.Precompute() // aceleramos su uso con un precálculo
+		pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
+		chk(err)
 
-	pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
-	chk(err)
+		keyPub := pkClient.Public()           // extraemos la clave pública por separado
+		pubJSON, err := json.Marshal(&keyPub) // y codificamos con JSON
+		chk(err)
 
-	keyPub := pkClient.Public()           // extraemos la clave pública por separado
-	pubJSON, err := json.Marshal(&keyPub) // y codificamos con JSON
-	chk(err)
+		// ** ejemplo de registro
+		data := url.Values{}                      // estructura para contener los valores
+		data.Set("cmd", "register")               // comando (string)
+		data.Set("user", "usuario")               // usuario (string)
+		data.Set("pass", util.Encode64(keyLogin)) // "contraseña" a base64
 
-	// ** ejemplo de registro
-	data := url.Values{}                      // estructura para contener los valores
-	data.Set("cmd", "register")               // comando (string)
-	data.Set("user", "usuario")               // usuario (string)
-	data.Set("pass", util.Encode64(keyLogin)) // "contraseña" a base64
+		// comprimimos y codificamos la clave pública
+		data.Set("pubkey", util.Encode64(util.Compress(pubJSON)))
 
-	// comprimimos y codificamos la clave pública
-	data.Set("pubkey", util.Encode64(util.Compress(pubJSON)))
+		// comprimimos, ciframos y codificamos la clave privada
+		data.Set("prikey", util.Encode64(util.Encrypt(util.Compress(pkJSON), keyData)))
 
-	// comprimimos, ciframos y codificamos la clave privada
-	data.Set("prikey", util.Encode64(util.Encrypt(util.Compress(pkJSON), keyData)))
+		r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+		chk(err)
+		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
+		r.Body.Close()             // hay que cerrar el reader del body
+		fmt.Println()
 
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
-	chk(err)
-	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-	r.Body.Close()             // hay que cerrar el reader del body
-	fmt.Println()
+		// ** ejemplo de login
+		data = url.Values{}
+		data.Set("cmd", "login")                                  // comando (string)
+		data.Set("user", "usuario")                               // usuario (string)
+		data.Set("pass", util.Encode64(keyLogin))                 // contraseña (a base64 porque es []byte)
+		r, err = client.PostForm("https://localhost:10443", data) // enviamos por POST
+		chk(err)
+		resp := srv.Resp{}
+		json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
+		fmt.Println(resp)                     // imprimimos por pantalla
+		r.Body.Close()                        // hay que cerrar el reader del body
 
-	// ** ejemplo de login
-	data = url.Values{}
-	data.Set("cmd", "login")                                  // comando (string)
-	data.Set("user", "usuario")                               // usuario (string)
-	data.Set("pass", util.Encode64(keyLogin))                 // contraseña (a base64 porque es []byte)
-	r, err = client.PostForm("https://localhost:10443", data) // enviamos por POST
-	chk(err)
-	resp := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-	fmt.Println(resp)                     // imprimimos por pantalla
-	r.Body.Close()                        // hay que cerrar el reader del body
+		// ** ejemplo de data sin utilizar el token correcto
+		badToken := make([]byte, 16)
+		_, err = rand.Read(badToken)
+		chk(err)
 
-	// ** ejemplo de data sin utilizar el token correcto
-	badToken := make([]byte, 16)
-	_, err = rand.Read(badToken)
-	chk(err)
+		data = url.Values{}
+		data.Set("cmd", "data")                    // comando (string)
+		data.Set("user", "usuario")                // usuario (string)
+		data.Set("pass", util.Encode64(keyLogin))  // contraseña (a base64 porque es []byte)
+		data.Set("token", util.Encode64(badToken)) // token incorrecto
+		r, err = client.PostForm("https://localhost:10443", data)
+		chk(err)
+		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
+		r.Body.Close()             // hay que cerrar el reader del body
+		fmt.Println()
 
-	data = url.Values{}
-	data.Set("cmd", "data")                    // comando (string)
-	data.Set("user", "usuario")                // usuario (string)
-	data.Set("pass", util.Encode64(keyLogin))  // contraseña (a base64 porque es []byte)
-	data.Set("token", util.Encode64(badToken)) // token incorrecto
-	r, err = client.PostForm("https://localhost:10443", data)
-	chk(err)
-	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-	r.Body.Close()             // hay que cerrar el reader del body
-	fmt.Println()
-
-	// ** ejemplo de data con token correcto
-	data = url.Values{}
-	data.Set("cmd", "data")                      // comando (string)
-	data.Set("user", "usuario")                  // usuario (string)
-	data.Set("pass", util.Encode64(keyLogin))    // contraseña (a base64 porque es []byte)
-	data.Set("token", util.Encode64(resp.Token)) // token correcto
-	r, err = client.PostForm("https://localhost:10443", data)
-	chk(err)
-	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-	r.Body.Close()             // hay que cerrar el reader del body
-	fmt.Println()
-
+		// ** ejemplo de data con token correcto
+		data = url.Values{}
+		data.Set("cmd", "data")                      // comando (string)
+		data.Set("user", "usuario")                  // usuario (string)
+		data.Set("pass", util.Encode64(keyLogin))    // contraseña (a base64 porque es []byte)
+		data.Set("token", util.Encode64(resp.Token)) // token correcto
+		r, err = client.PostForm("https://localhost:10443", data)
+		chk(err)
+		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
+		r.Body.Close()             // hay que cerrar el reader del body
+		fmt.Println()
+	*/
 	menuInicio(client)
 }

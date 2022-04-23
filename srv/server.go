@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"golang.org/x/crypto/argon2"
-	"golang.org/x/crypto/scrypt"
 )
 
 //Almacenamiento de datos
@@ -94,25 +93,27 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
 
 		//argon2
-		u.Hash = argon2.IDKey([]byte(password), u.Salt, 16384, 8, 1, 32)
+		u.Hash = argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
 
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
 
-		gUsers[u.Name] = u
+		gUsers[u.Username] = u
 		response(w, true, "Usuario registrado", u.Token)
 
 	case "login": // ** login
 		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+
 		if !ok {
 			//response(w, false, "Usuario inexistente", nil)
 			w.WriteHeader(202)
 			return
 		} else {
-			password := util.Decode64(req.Form.Get("pass"))          // obtenemos la contraseña (keyLogin)
-			hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
-			if !bytes.Equal(u.Hash, hash) {                          // comparamos
+			password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
+			hash := argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
+
+			if !bytes.Equal(u.Hash, hash) { // comparamos
 				//response(w, false, "Credenciales inválidas", nil)
 				w.WriteHeader(203)
 			} else {
@@ -182,7 +183,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		password := util.Decode64(passRegistro) // contraseña (keyLogin)
 
 		// Argon2
-		u.Hash = argon2.IDKey([]byte(password), u.Salt, 16384, 8, 1, 32)
+		u.Hash = argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
 
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)

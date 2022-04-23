@@ -61,7 +61,7 @@ func login(client *http.Client) {
 	pass := hash[:32] // una mitad para el login (256 bits)
 	//keyData := hash[32:64] // la otra para los datos (256 bits)
 	usuario.Password = util.Encode64(pass)
-	usuario.Username = usernameLogin
+	usuario.Username = util.Encode64([]byte(usernameLogin))
 	data := url.Values{}
 	data.Set("cmd", "login")
 	data.Set("userName", usuario.Username)
@@ -277,7 +277,7 @@ func menuInicio(client *http.Client) {
 	salir := false
 	var eleccion int
 	for salir == false {
-		fmt.Println(" 1. Login")
+		fmt.Println("\n 1. Login")
 		fmt.Println(" 2. Registro")
 		fmt.Println(" 3. Salir")
 		fmt.Print("Opcion: ")

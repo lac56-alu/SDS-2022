@@ -75,33 +75,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8") // cabecera estándar
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
-	case "register": // ** registro
-		_, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if ok {
-			//response(w, false, "Usuario ya registrado", nil)
-			w.WriteHeader(201)
-			return
-		}
-
-		u := user{}
-		u.Name = req.Form.Get("user")                   // nombre
-		u.Salt = make([]byte, 16)                       // sal (16 bytes == 128 bits)
-		rand.Read(u.Salt)                               // la sal es aleatoria
-		u.Data = make(map[string]string)                // reservamos mapa de datos de usuario
-		u.Data["private"] = req.Form.Get("prikey")      // clave privada
-		u.Data["public"] = req.Form.Get("pubkey")       // clave pública
-		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
-
-		//argon2
-		u.Hash = argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
-
-		u.Seen = time.Now()        // asignamos tiempo de login
-		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
-		rand.Read(u.Token)         // el token es aleatorio
-
-		gUsers[u.Username] = u
-		response(w, true, "Usuario registrado", u.Token)
-
 	case "login": // ** login
 		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
 
@@ -147,7 +120,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		gUsers[u.Name] = u
 		response(w, true, string(datos), u.Token)
 
-	case "prueba":
+	case "registro":
 		/*
 			fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
 			fmt.Printf("\n - Password: %q", req.Form.Get("pass"))

@@ -154,7 +154,7 @@ func registro(client *http.Client) bool {
 	*/
 
 	data := url.Values{} // estructura para contener los valores
-	data.Set("cmd", "prueba")
+	data.Set("cmd", "registro")
 	data.Set("nombre", util.Encode64([]byte(usuario.Nombre)))
 	data.Set("username", util.Encode64([]byte(usuario.Username)))
 	data.Set("pass", usuario.Password)
@@ -221,18 +221,48 @@ func crearFichero(client *http.Client) {
 	}
 }
 func subirFichero(client *http.Client) {
-
+	/*
+		1) pasarle la ubicacion del archivo y el nombre
+		2) copiamos tanto el nombre como el fichero como el contenido en un fichero
+		en el servidor
+	*/
 }
 func listarFichero(client *http.Client) {
-
+	/*
+		1) buscar la carpeta del usuario == userName
+		2) guardar array o vector los nombre de todos los ficheros que tenga
+		3) mostrar todos los nombres
+	*/
 }
 func verFichero(client *http.Client) {
-
+	/*
+		1) metemos el nombre del fichero que queremos ver
+		2) buscamos en la carpeta ese nombre
+		3) sacamos por pantalla el nombre del fichero y el contenido
+	*/
 }
 func compartirFichero(client *http.Client) {
-
+	/*
+		1) pedimos el nombre del fichero que queremos compartir (comprobamos)
+		2) pedimos del usuario al que se lo queremos compartir (comprobamos)
+		3) copiamos el archivo desde el usuario origen al usuario destino
+	*/
 }
 func comentar(client *http.Client) {
+	/*
+		hay que darle acceso al archivo de la carpeta del usuario origen
+		o hay que copiar el archivo del usuario origen al destino
+		si es asi, como se harian los comentarios
+		es bueno hacer un struct para controlar los archivos
+		struct: id fichero, contenido, usuarios compartidos, comentarios
+	*/
+}
+func descargar(client *http.Client) {
+	/*
+		1) pedimos el nombre del fichero (comprobamos dentro de la carpeta)
+		2) pedimos la ubicacion donde quiere copiar el archivo
+		3) copiamos el archivo en la ubicacion del usuario
+	*/
 }
 
 func menuSecundario(client *http.Client) {

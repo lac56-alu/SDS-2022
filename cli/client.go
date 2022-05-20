@@ -26,6 +26,13 @@ func chk(e error) {
 	}
 }
 
+type CurrentUser struct {
+	Username string `json:"userName"`
+	Token    []byte `json:"Token"`
+}
+
+var usuarioActivo CurrentUser = CurrentUser{}
+
 type User struct {
 	Nombre     string `json:"nombre"`
 	Username   string `json:"userName"`
@@ -67,6 +74,9 @@ func login(client *http.Client) {
 	data.Set("userName", usuario.Username)
 	data.Set("pass", usuario.Password)
 	r, _ := client.PostForm("https://localhost:10443", data)
+	respuesta := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&respuesta)
+
 	if r.StatusCode == 202 {
 		fmt.Println("No existe usuario con datos introducidos")
 	} else {
@@ -74,7 +84,10 @@ func login(client *http.Client) {
 			fmt.Println("Credenciales Invalidas")
 		} else {
 			if r.StatusCode == 200 {
-				UserNameGlobal = usernameLogin
+				UserNameGlobal = usuario.Username
+				usuarioActivo.Username = usuario.Username
+				//usuarioActivo.Token = util.Decode64(string(respuesta.Token))
+
 				menuSecundario(client)
 			}
 		}
@@ -233,6 +246,24 @@ func listarFichero(client *http.Client) {
 		2) guardar array o vector los nombre de todos los ficheros que tenga
 		3) mostrar todos los nombres
 	*/
+	data := url.Values{} // estructura para contener los valores
+	data.Set("cmd", "listarFicheros")
+	data.Set("Username", usuarioActivo.Username)
+	data.Set("Token", string(usuarioActivo.Token))
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+
+	respuesta := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&respuesta)
+
+	if respuesta.Ok == false {
+		fmt.Println("Error al hacer la peticion al servidor")
+	} else {
+		fmt.Println("\n                ¡TUS ARCHIVOS! \n")
+		fmt.Println("\n ----------------------------------------------------\n")
+		fmt.Printf(respuesta.Msg)
+	}
+
 }
 func verFichero(client *http.Client) {
 	/*

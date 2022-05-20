@@ -1,0 +1,35 @@
+{
+    "name": "ioutil",
+    "version": "0.0.1",
+    "description": "general IO stream manipulation utilities for nodejs",
+    "main": "index.js",
+    "scripts": {
+        "test": "jest"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/larryhe/ioutils.git"
+    },
+    "keywords": [
+        "io",
+        "fs"
+    ],
+    "author": "larry",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/larryhe/ioutils/issues"
+    },
+    "homepage": "https://github.com/larryhe/ioutils#readme",
+    "husky": {
+        "hooks": {
+            "pre-commit": "pretty-quick --staged"
+        }
+    },
+    "devDependencies": {
+        "husky": "^3.0.5",
+        "jest": "^24.9.0",
+        "memfs": "^2.15.5",
+        "prettier": "^1.18.2",
+        "pretty-quick": "^1.11.1"
+    }
+}

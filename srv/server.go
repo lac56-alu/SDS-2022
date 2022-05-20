@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"sdshttp/util"
@@ -94,7 +96,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 				rand.Read(u.Token)         // el token es aleatorio
 				gUsers[u.Name] = u
-				//response(w, true, "Credenciales válidas", u.Token)
+				response(w, true, "Credenciales válidas", u.Token)
 				w.WriteHeader(200)
 			}
 		}
@@ -169,16 +171,20 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
 	case "create":
-		u, ok := gUsers[req.Form.Get("username")] // ¿existe ya el usuario?
+		nombre := string(util.Decode64(req.Form.Get("username")))
+		u, ok := gUsers[nombre] // ¿existe ya el usuario?
 		if !ok {
 			//response(w, false, "Usuario inexistente", nil)
+			fmt.Println("hola1")
 			w.WriteHeader(202)
 			return
 		} else {
+			fmt.Println("hola2")
 			texto := req.Form.Get("Texto")
 			nom := req.Form.Get("NombreFichero")
 			fmt.Println(u.Name)
-			path := "C:\\Users\\Adel\\Desktop\\2122\\SDS\\ficheros\\" + u.Name
+			//path := "C:\\Users\\Adel\\Desktop\\2122\\SDS\\ficheros\\" + u.Name
+			path := "F:\\ServidorSDS \\" + u.Name
 			_, erro := os.Stat(path)
 			if os.IsNotExist(erro) {
 				erro = os.Mkdir(path, 0755)
@@ -194,6 +200,20 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 	case "lectura":
+
+	case "listarFicheros":
+		archivos, err := ioutil.ReadDir("F:\\ServidorSDS")
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, archivo := range archivos {
+			fmt.Println("Nombre:", archivo.Name())
+			fmt.Println("Tamaño:", archivo.Size())
+			fmt.Println("Modo:", archivo.Mode())
+			fmt.Println("Ultima modificación:", archivo.ModTime())
+			fmt.Println("Es directorio?:", archivo.IsDir())
+			fmt.Println("-----------------------------------------")
+		}
 
 	default:
 		response(w, false, "Comando no implementado", nil)

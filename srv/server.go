@@ -4,13 +4,12 @@ Servidor
 package srv
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"sdshttp/util"
@@ -21,6 +20,7 @@ import (
 
 //Almacenamiento de datos
 //var usuariosRegistrados []user
+var claveServidor = ""
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -59,8 +59,12 @@ type respuestaServer struct {
 var gUsers map[string]user
 
 // gestiona el modo servidor
-func Run() {
+func Run(clave string) {
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
+
+	//Leemos y almacenamos la clave que va a usar el servidor
+	claveServidor = clave
+	fmt.Println("Clave Servidor: " + claveServidor)
 
 	http.HandleFunc("/", handler) // asignamos un handler global
 
@@ -81,16 +85,14 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
 
 		if !ok {
-			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
+			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
 			password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
 			hash := argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
 
 			if !bytes.Equal(u.Hash, hash) { // comparamos
-				//response(w, false, "Credenciales inválidas", nil)
-				w.WriteHeader(203)
+				response(w, false, "Credenciales inválidas", nil)
 			} else {
 				u.Seen = time.Now()        // asignamos tiempo de login
 				u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
@@ -123,24 +125,16 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		response(w, true, string(datos), u.Token)
 
 	case "registro":
-		/*
-			fmt.Printf("\n - Nombre Usuario: %q", req.Form.Get("nombre"))
-			fmt.Printf("\n - Password: %q", req.Form.Get("pass"))
-			fmt.Printf("\n - Email Codificado: %q", req.Form.Get("email"))
-			fmt.Printf("\n - Email Decodificado: %q", util.Decode64(req.Form.Get("email")))
-		*/
-
 		nombreRegistro := req.Form.Get("nombre")
 		usernameRegistro := req.Form.Get("username")
 		passRegistro := req.Form.Get("pass")
 		emailRegistro := req.Form.Get("email")
-		//keyDataRegistro := req.Form.Get("keyData")
+		keyDataRegistro := req.Form.Get("keyData")
 		publicKeyRegistro := req.Form.Get("publicKey")
 		privateKeyRegistro := req.Form.Get("privateKey")
 
 		_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
 		if ok {
-			w.WriteHeader(400)
 			response(w, false, "Usuario ya registrado", nil)
 			return
 		}
@@ -154,7 +148,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
 		u.Data["private"] = privateKeyRegistro // clave privada
 		u.Data["public"] = publicKeyRegistro   // clave pública
-		//u.Data["keyData"] = keyDataRegistro
+		u.Data["keyData"] = keyDataRegistro
 		password := util.Decode64(passRegistro) // contraseña (keyLogin)
 
 		// Argon2
@@ -163,35 +157,41 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 		rand.Read(u.Token)         // el token es aleatorio
-		//fmt.Printf("\n Token: %q", u.Token)
-
 		gUsers[u.Username] = u
-		w.WriteHeader(200)
-		//w.Header().Set("Authoritation", util.Encode64([]byte(u.Token)))
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
 	case "create":
-		nombre := string(util.Decode64(req.Form.Get("username")))
+		nombre := string(util.Decode64(req.Form.Get("userName")))
 		u, ok := gUsers[nombre] // ¿existe ya el usuario?
 		if !ok {
 			//response(w, false, "Usuario inexistente", nil)
-			fmt.Println("hola1")
+			fmt.Println("No se ha encontrado al usuario")
 			w.WriteHeader(202)
 			return
 		} else {
-			fmt.Println("hola2")
+			fmt.Println("Se ha encontrado usuario")
+
 			texto := req.Form.Get("Texto")
 			nom := req.Form.Get("NombreFichero")
-			fmt.Println(u.Name)
+			fmt.Println("Nombre encoded: " + u.Name)
+
 			//path := "C:\\Users\\Adel\\Desktop\\2122\\SDS\\ficheros\\" + u.Name
-			path := "F:\\ServidorSDS \\" + u.Name
+			path := "F:\\ServidorSDS\\" + u.Name
+			us := string(util.Decode64(u.Name))
+			//path := "C:\\ServidorSDS"
 			_, erro := os.Stat(path)
 			if os.IsNotExist(erro) {
 				erro = os.Mkdir(path, 0755)
 			}
+			path += "\\" + us
+			_, ero := os.Stat(path)
+			if os.IsNotExist(ero) {
+				ero = os.Mkdir(path, 0755)
+			}
 			f, err := os.Create(path + "\\" + nom + ".txt")
 			if err != nil {
 				w.WriteHeader(201)
+				fmt.Println(path)
 				return
 			} else {
 				fmt.Fprintln(f, texto)
@@ -199,22 +199,138 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(200)
 			}
 		}
-	case "lectura":
+	case "subir":
+		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+		if !ok {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+			ubi := req.Form.Get("Ubicacion")
+			nom := req.Form.Get("NombreFichero")
+			path := ubi
+			_, erro := os.Stat(path)
+			if os.IsNotExist(erro) {
+				w.WriteHeader(205)
+				return
+			}
+			f, err := os.Open(path + "\\" + nom + ".txt")
+			if err != nil {
+				w.WriteHeader(203)
+			} else {
+				text := ""
+				escan := bufio.NewScanner(f)
+				for escan.Scan() {
+					text += escan.Text() + "\n"
+				}
+				f.Close()
+				//pathh := "C:\\ServidorSDS"
+				pathh := "F:\\ServidorSDS"
+				_, erro := os.Stat(pathh)
+				if os.IsNotExist(erro) {
+					erro = os.Mkdir(pathh, 0755)
+				}
+				pathh += "\\" + string(util.Decode64(u.Name))
+				_, ero := os.Stat(pathh)
+				if os.IsNotExist(ero) {
+					ero = os.Mkdir(pathh, 0755)
+				}
+				f, err := os.Create(pathh + "\\" + nom + ".txt")
+				if err != nil {
+					w.WriteHeader(201)
+					return
+				} else {
+					fmt.Fprintln(f, util.Encode64([]byte(text)))
+					f.Close()
+					w.WriteHeader(200)
+				}
 
-	case "listarFicheros":
-		archivos, err := ioutil.ReadDir("F:\\ServidorSDS")
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, archivo := range archivos {
-			fmt.Println("Nombre:", archivo.Name())
-			fmt.Println("Tamaño:", archivo.Size())
-			fmt.Println("Modo:", archivo.Mode())
-			fmt.Println("Ultima modificación:", archivo.ModTime())
-			fmt.Println("Es directorio?:", archivo.IsDir())
-			fmt.Println("-----------------------------------------")
-		}
+			}
 
+		}
+	case "ver":
+		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+		if !ok {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+
+			nom := req.Form.Get("NombreFichero")
+			//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+			path := "F:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+			_, erro := os.Stat(path)
+			if os.IsNotExist(erro) {
+				w.WriteHeader(205)
+				return
+			}
+			f, err := os.Open(path + "\\" + nom + ".txt")
+			if err != nil {
+				w.WriteHeader(203)
+			} else {
+				text := ""
+				escan := bufio.NewScanner(f)
+				for escan.Scan() {
+					text += escan.Text() + "\n"
+				}
+				f.Close()
+				response(w, true, text, nil)
+			}
+		}
+	case "compartir":
+		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+		if !ok {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+			ud, ok := gUsers[req.Form.Get("usuario")]
+			if !ok {
+				w.WriteHeader(203)
+				return
+			} else {
+				nom := req.Form.Get("NombreFichero")
+
+				//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+				path := "F:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+				_, erro := os.Stat(path)
+				if os.IsNotExist(erro) {
+					w.WriteHeader(205)
+					return
+				}
+				f, err := os.Open(path + "\\" + nom + ".txt")
+				if err != nil {
+					w.WriteHeader(206)
+				} else {
+					text := ""
+					escan := bufio.NewScanner(f)
+					for escan.Scan() {
+						text += escan.Text() + "\n"
+					}
+					f.Close()
+
+					//path := "C:\\ServidorSDS"
+					path := "F:\\ServidorSDS"
+					_, erro := os.Stat(path)
+					if os.IsNotExist(erro) {
+						erro = os.Mkdir(path, 0755)
+					}
+					path += "\\" + string(util.Decode64(ud.Name))
+					_, ero := os.Stat(path)
+					if os.IsNotExist(ero) {
+						ero = os.Mkdir(path, 0755)
+					}
+					f, err := os.Create(path + "\\" + nom + ".txt")
+					if err != nil {
+						w.WriteHeader(201)
+						return
+					} else {
+						fmt.Fprintln(f, text)
+						f.Close()
+					}
+				}
+			}
+		}
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
@@ -233,10 +349,9 @@ type Resp struct {
 // función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
-	fmt.Printf("\n Token: %q", token)
-	rJSON, err := json.Marshal(&r) // codificamos en JSON
-	chk(err)                       // comprobamos error
-	w.Write(rJSON)                 // escribimos el JSON resultante
+	rJSON, err := json.Marshal(&r)            // codificamos en JSON
+	chk(err)                                  // comprobamos error
+	w.Write(rJSON)                            // escribimos el JSON resultante
 }
 
 //Mis llamadas

@@ -43,11 +43,6 @@ type User struct {
 	privateKey string `json:"privateKey"`
 }
 
-/*type respuestaServer struct {
-	Ok    bool   `json:"Ok"`
-	Msg   string `json:"Msg"`
-	Token string `json:"Token"`
-}*/
 var UserNameGlobal string
 
 func login(client *http.Client) {
@@ -56,14 +51,13 @@ func login(client *http.Client) {
 	var usernameLogin string
 	fmt.Scanln(&usernameLogin)
 
-	fmt.Print("\nContraseña: ")
+	fmt.Print("Contraseña: ")
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	if err != nil {
 		fmt.Println("\n¡ERROR CONTRASEÑA!")
 	}
 	passs := string(bytePassword)
-	//fmt.Printf("\nContraseña: %q", passs)
 	hash := sha512.Sum512([]byte(passs))
 	pass := hash[:32] // una mitad para el login (256 bits)
 	//keyData := hash[32:64] // la otra para los datos (256 bits)
@@ -92,12 +86,10 @@ func login(client *http.Client) {
 			}
 		}
 	}
-	/*io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-	r.Body.Close()             // hay que cerrar el reader del body
-	fmt.Println()*/
+	r.Body.Close()
 }
 
-func registro(client *http.Client) bool {
+func registro(client *http.Client) {
 	var usuario User = User{}
 
 	fmt.Print("Nombre: ")
@@ -155,60 +147,27 @@ func registro(client *http.Client) bool {
 
 	usuario.keyData = util.Encode64(keyData)
 
-	/*
-		fmt.Printf("\nContraseña: %q", pass)
-
-		jsonEnviar, errJSON := json.Marshal(usuario)
-		if errJSON != nil {
-			panic("\n¡ERROR CIFRAR JSON!")
-		}
-
-		respuestaServidor, errorServidor := client.Post("http://localhost:10443/register", "application/json; charset=utf-8", bytes.NewBuffer(jsonEnviar))
-	*/
-
 	data := url.Values{} // estructura para contener los valores
 	data.Set("cmd", "registro")
 	data.Set("nombre", util.Encode64([]byte(usuario.Nombre)))
 	data.Set("username", util.Encode64([]byte(usuario.Username)))
 	data.Set("pass", usuario.Password)
 	data.Set("email", util.Encode64([]byte(usuario.Email)))
-	//data.Set("keyData", usuario.keyData)
+	data.Set("keyData", usuario.keyData)
 	data.Set("publicKey", usuario.publicKey)
 	data.Set("privateKey", usuario.privateKey)
 
-	//pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
-	//chk(err)
-
 	r, errorServidor := client.PostForm("https://localhost:10443", data)
-	//io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-
-	//tokenUsuario := util.Decode64(r.Header.Get("Authoritation"))
 
 	respuesta := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&respuesta)
-	//fmt.Println()
-
-	fmt.Println("\n --------------------------------------------------------------------------------------- \n")
 
 	if errorServidor != nil {
 		panic("\n¡ERROR SERVIDOR RESPUESTA!")
+	} else {
+		fmt.Println(respuesta.Msg)
 	}
-
-	//defer r.Body.Close()
-
-	if r.StatusCode == 400 {
-		fmt.Println("\n ALGO SALIÓ MAL.... \n")
-		return false
-	}
-
-	if r.StatusCode == 200 {
-		fmt.Println("\n ¡TE HAS REGISTRADO DE FORMA CORRECTA! \n")
-		fmt.Printf("\n Token: %q", respuesta.Token)
-		return true
-	}
-	//fmt.Println(bodyString)
-	r.Body.Close() // hay que cerrar el reader del body
-	return false
+	r.Body.Close()
 }
 func crearFichero(client *http.Client) {
 	fmt.Print("Nombre Fichero: ")
@@ -218,9 +177,9 @@ func crearFichero(client *http.Client) {
 	var texto string
 	fmt.Scanln(&texto)
 
-	data := url.Values{} // estructura para contener los valores
+	data := url.Values{}
 	data.Set("cmd", "create")
-	data.Set("username", UserNameGlobal)
+	data.Set("userName", util.Encode64([]byte(usuarioActivo.Username)))
 	data.Set("NombreFichero", fichero)
 	data.Set("Texto", util.Encode64([]byte(texto)))
 
@@ -239,6 +198,37 @@ func subirFichero(client *http.Client) {
 		2) copiamos tanto el nombre como el fichero como el contenido en un fichero
 		en el servidor
 	*/
+	fmt.Print("Nombre Fichero: ")
+	var fichero string
+	fmt.Scanln(&fichero)
+	fmt.Print("Ubicacion del fichero: ")
+	var ubi string
+	fmt.Scanln(&ubi)
+
+	data := url.Values{}
+	data.Set("cmd", "subir")
+	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("NombreFichero", fichero)
+	data.Set("Ubicacion", ubi)
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	if r.StatusCode == 200 {
+		fmt.Println("Fichero guardado con exito en el servidor")
+	} else {
+		if r.StatusCode == 203 {
+			fmt.Println("No ha encontrado el fichero para subir")
+		} else {
+			if r.StatusCode == 205 {
+				fmt.Println("No existe la ubicacion introducida")
+			} else {
+				if r.StatusCode == 204 {
+					fmt.Println("No se ha podido leer fichero introducido")
+				} else {
+					fmt.Println("No se ha podido subir fichero al servidor")
+				}
+			}
+		}
+	}
 }
 func listarFichero(client *http.Client) {
 	/*
@@ -271,6 +261,27 @@ func verFichero(client *http.Client) {
 		2) buscamos en la carpeta ese nombre
 		3) sacamos por pantalla el nombre del fichero y el contenido
 	*/
+	fmt.Print("Nombre Fichero: ")
+	var fichero string
+	fmt.Scanln(&fichero)
+	data := url.Values{}
+	data.Set("cmd", "ver")
+	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("NombreFichero", fichero)
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	if r.StatusCode == 205 {
+		fmt.Println("No existe carpeta con tu nombre en el servidor")
+	} else {
+		if r.StatusCode == 203 {
+			fmt.Println("No existe fichero con el nombre introducido")
+		} else {
+			respuesta := srv.Resp{}
+			json.NewDecoder(r.Body).Decode(&respuesta)
+			fmt.Println(string(util.Decode64(respuesta.Msg)))
+		}
+	}
+	r.Body.Close()
 }
 func compartirFichero(client *http.Client) {
 	/*
@@ -278,6 +289,30 @@ func compartirFichero(client *http.Client) {
 		2) pedimos del usuario al que se lo queremos compartir (comprobamos)
 		3) copiamos el archivo desde el usuario origen al usuario destino
 	*/
+	fmt.Print("Nombre Fichero: ")
+	var fichero string
+	fmt.Scanln(&fichero)
+	fmt.Print("UserName: ")
+	var usern string
+	fmt.Scanln(&usern)
+	data := url.Values{}
+	data.Set("cmd", "compartir")
+	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("usuario", util.Encode64([]byte(usern)))
+	data.Set("NombreFichero", fichero)
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	if r.StatusCode == 203 {
+		fmt.Println("No existe el usuario introducido")
+	} else {
+		if r.StatusCode == 206 {
+			fmt.Println("No existe fichero con el nombre introducido")
+		} else {
+			fmt.Println("Fichero copiado correctamente")
+		}
+	}
+	r.Body.Close()
+
 }
 func comentar(client *http.Client) {
 	/*
@@ -306,25 +341,36 @@ func menuSecundario(client *http.Client) {
 		fmt.Println(" 4. Ver Fichero")
 		fmt.Println(" 5. Compartir Fichero")
 		fmt.Println(" 6. Comentar")
-		fmt.Println(" 7. Volver al menu principal")
+		fmt.Println(" 7. Descargar Fichero")
+		fmt.Println(" 8. Volver al menu principal")
 		fmt.Print("Opcion: ")
 		fmt.Scanln(&eleccion)
 
 		switch eleccion {
 		case 1:
 			crearFichero(client)
+			break
 		case 2:
 			subirFichero(client)
+			break
 		case 3:
 			listarFichero(client)
+			break
 		case 4:
 			verFichero(client)
+			break
 		case 5:
 			compartirFichero(client)
+			break
 		case 6:
 			comentar(client)
+			break
 		case 7:
+			descargar(client)
+			break
+		case 8:
 			volver = true
+			break
 		default:
 			fmt.Println(" >>> Elige una de las opciones")
 			menuSecundario(client)
@@ -338,7 +384,7 @@ func menuInicio(client *http.Client) {
 	salir := false
 	var eleccion int
 	for salir == false {
-		fmt.Println("\n 1. Login")
+		fmt.Println(" 1. Login")
 		fmt.Println(" 2. Registro")
 		fmt.Println(" 3. Salir")
 		fmt.Print("Opcion: ")
@@ -372,87 +418,5 @@ func Run() {
 	client := &http.Client{Transport: tr}
 
 	menuInicio(client)
-
 	fmt.Println("\n --------------------------------------------------------------------------------------- \n")
-	/*
-			// hash con SHA512 de la contraseña
-			keyClient := sha512.Sum512([]byte("contraseña del cliente"))
-			keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
-			keyData := keyClient[32:64] // la otra para los datos (256 bits)
-
-		// hash con SHA512 de la contraseña
-		/*keyClient := sha512.Sum512([]byte("contraseña del cliente"))
-		keyLogin := keyClient[:32]  // una mitad para el login (256 bits)
-		keyData := keyClient[32:64] // la otra para los datos (256 bits)
-
-			pkJSON, err := json.Marshal(&pkClient) // codificamos con JSON
-			chk(err)
-
-			keyPub := pkClient.Public()           // extraemos la clave pública por separado
-			pubJSON, err := json.Marshal(&keyPub) // y codificamos con JSON
-			chk(err)
-
-			// ** ejemplo de registro
-			data := url.Values{}                      // estructura para contener los valores
-			data.Set("cmd", "register")               // comando (string)
-			data.Set("user", "usuario")               // usuario (string)
-			data.Set("pass", util.Encode64(keyLogin)) // "contraseña" a base64
-
-			// comprimimos y codificamos la clave pública
-			data.Set("pubkey", util.Encode64(util.Compress(pubJSON)))
-
-			// comprimimos, ciframos y codificamos la clave privada
-			data.Set("prikey", util.Encode64(util.Encrypt(util.Compress(pkJSON), keyData)))
-
-			r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
-			chk(err)
-			io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-			r.Body.Close()             // hay que cerrar el reader del body
-			fmt.Println()
-
-			// ** ejemplo de login
-			data = url.Values{}
-			data.Set("cmd", "login")                                  // comando (string)
-			data.Set("user", "usuario")                               // usuario (string)
-			data.Set("pass", util.Encode64(keyLogin))                 // contraseña (a base64 porque es []byte)
-			r, err = client.PostForm("https://localhost:10443", data) // enviamos por POST
-			chk(err)
-			resp := srv.Resp{}
-			json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
-			fmt.Println(resp)                     // imprimimos por pantalla
-			r.Body.Close()                        // hay que cerrar el reader del body
-
-			// ** ejemplo de data sin utilizar el token correcto
-			badToken := make([]byte, 16)
-			_, err = rand.Read(badToken)
-			chk(err)
-
-		// ** ejemplo de data sin utilizar el token correcto
-		badToken := make([]byte, 16)
-		_, err = rand.Read(badToken)
-		chk(err)
-
-		data = url.Values{}
-		data.Set("cmd", "data")                    // comando (string)
-		data.Set("user", "usuario")                // usuario (string)
-		data.Set("pass", util.Encode64(keyLogin))  // contraseña (a base64 porque es []byte)
-		data.Set("token", util.Encode64(badToken)) // token incorrecto
-		r, err = client.PostForm("https://localhost:10443", data)
-		chk(err)
-		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-		r.Body.Close()             // hay que cerrar el reader del body
-		fmt.Println()
-
-		// ** ejemplo de data con token correcto
-		data = url.Values{}
-		data.Set("cmd", "data")                      // comando (string)
-		data.Set("user", "usuario")                  // usuario (string)
-		data.Set("pass", util.Encode64(keyLogin))    // contraseña (a base64 porque es []byte)
-		data.Set("token", util.Encode64(resp.Token)) // token correcto
-		r, err = client.PostForm("https://localhost:10443", data)
-		chk(err)
-		io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
-		r.Body.Close()             // hay que cerrar el reader del body
-		fmt.Println()
-	*/
 }

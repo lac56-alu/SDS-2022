@@ -82,17 +82,42 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
 	case "login": // ** login
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
 
-		if !ok {
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			fmt.Println("\n Variable del Decrypt: ", c)
+			fmt.Println("Variable LogIn: ", usLog)
+
+			if usLog == c {
+				fmt.Println("\n Encuentra en el bucle")
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+			}
+		}
+
+		if !comprobarUsuarioBool {
+			fmt.Println("\n NO HA ENCONTRADO AL USUARIO")
+			w.WriteHeader(404)
 			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
+			fmt.Println("\n Entra en el else, varible true")
+			//salt := util.Decrypt(u.Salt, util.Decode64(claveServidor))
+			//fmt.Println("\n Salt LogIn: ", salt)
 			password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
 			hash := argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
 
 			if !bytes.Equal(u.Hash, hash) { // comparamos
+				w.WriteHeader(401)
 				response(w, false, "Credenciales inválidas", nil)
+
 			} else {
 				u.Seen = time.Now()        // asignamos tiempo de login
 				u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
@@ -133,24 +158,34 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		publicKeyRegistro := req.Form.Get("publicKey")
 		privateKeyRegistro := req.Form.Get("privateKey")
 
-		_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
-		if ok {
-			response(w, false, "Usuario ya registrado", nil)
-			return
+		u := user{}
+		u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+
+		for name := range gUsers {
+			var opa = util.Encode64(util.Decrypt(util.Decode64(u.Username), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			fmt.Println("\nVARIBABLE u:", u.Username)
+			fmt.Println("\nVARIBABLE opa:", opa)
+			fmt.Println("\nVariable Almacen:", name)
+			fmt.Println("\nVariable Decrypt:", c)
+
+			if opa == c {
+				response(w, false, "Usuario ya registrado", nil)
+				return
+			}
 		}
 
-		u := user{}
-		u.Name = nombreRegistro
-		u.Email = emailRegistro
-		u.Username = usernameRegistro
-		u.Salt = make([]byte, 16)              // sal (16 bytes == 128 bits)
-		rand.Read(u.Salt)                      // la sal es aleatoria
-		u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
-		u.Data["private"] = privateKeyRegistro // clave privada
-		u.Data["public"] = publicKeyRegistro   // clave pública
-		u.Data["keyData"] = keyDataRegistro
-		password := util.Decode64(passRegistro) // contraseña (keyLogin)
+		u.Name = util.Encode64(util.Encrypt(util.Decode64(nombreRegistro), util.Decode64(claveServidor)))
+		u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
+		u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
 
+		u.Salt = make([]byte, 16)                                                                                        // sal (16 bytes == 128 bits)
+		rand.Read(u.Salt)                                                                                                // la sal es aleatoria
+		u.Data = make(map[string]string)                                                                                 // reservamos mapa de datos de usuario
+		u.Data["private"] = util.Encode64(util.Encrypt(util.Decode64(privateKeyRegistro), util.Decode64(claveServidor))) // clave privada
+		u.Data["public"] = util.Encode64(util.Encrypt(util.Decode64(publicKeyRegistro), util.Decode64(claveServidor)))   // clave pública
+		u.Data["keyData"] = util.Encode64(util.Encrypt(util.Decode64(keyDataRegistro), util.Decode64(claveServidor)))
+		password := util.Decode64(passRegistro) // contraseña (keyLogin)
 		// Argon2
 		u.Hash = argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
 
@@ -160,8 +195,81 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		gUsers[u.Username] = u
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
+		/*
+			_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
+			if ok {
+				response(w, false, "Usuario ya registrado", nil)
+				return
+			}
+
+			u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
+			u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+			fmt.Println("Username Sin: " + usernameRegistro)
+			fmt.Println("Username Encrypt: " + u.Username)
+
+			u.Salt = make([]byte, 16)                                                                                        // sal (16 bytes == 128 bits)
+			rand.Read(u.Salt)                                                                                                // la sal es aleatoria
+			u.Data = make(map[string]string)                                                                                 // reservamos mapa de datos de usuario
+			u.Data["private"] = util.Encode64(util.Encrypt(util.Decode64(privateKeyRegistro), util.Decode64(claveServidor))) // clave privada
+			u.Data["public"] = util.Encode64(util.Encrypt(util.Decode64(publicKeyRegistro), util.Decode64(claveServidor)))   // clave pública
+			u.Data["keyData"] = util.Encode64(util.Encrypt(util.Decode64(keyDataRegistro), util.Decode64(claveServidor)))
+			password := util.Decode64(passRegistro) // contraseña (keyLogin)
+
+
+			//u := user{}
+			u.Name = nombreRegistro
+			u.Email = emailRegistro
+			u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+			//u.Username = usernameRegistro
+			u.Salt = make([]byte, 16)              // sal (16 bytes == 128 bits)
+			rand.Read(u.Salt)                      // la sal es aleatoria
+			u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
+			u.Data["private"] = privateKeyRegistro // clave privada
+			u.Data["public"] = publicKeyRegistro   // clave pública
+			u.Data["keyData"] = keyDataRegistro
+			password := util.Decode64(passRegistro) // contraseña (keyLogin)
+		*/
 	case "create":
-		nombre := string(util.Decode64(req.Form.Get("userName")))
+		comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(req.Form.Get("userName")), util.Decode64(claveServidor)))
+		u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+
+		if !ok {
+			fmt.Println("\n ENTRA AQUI EL PUTO")
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+			fmt.Println("\n Entra en el else")
+
+			texto := req.Form.Get("Texto")
+			nom := req.Form.Get("NombreFichero")
+			us := string(util.Decode64(u.Name))
+			//path := "C:\\ServidorSDS"
+			path := "F:\\ServidorSDS"
+
+			_, erro := os.Stat(path)
+
+			if os.IsNotExist(erro) {
+				erro = os.Mkdir(path, 0755)
+			}
+			path += "\\" + us
+			_, ero := os.Stat(path)
+			if os.IsNotExist(ero) {
+				ero = os.Mkdir(path, 0755)
+			}
+			f, err := os.Create(path + "\\" + nom + ".txt")
+			if err != nil {
+				w.WriteHeader(201)
+				fmt.Println(path)
+				return
+			} else {
+				fmt.Fprintln(f, texto)
+				f.Close()
+				w.WriteHeader(200)
+			}
+		}
+
+		/*nombre := string(util.Decode64(req.Form.Get("userName")))
 		u, ok := gUsers[nombre] // ¿existe ya el usuario?
 		if !ok {
 			//response(w, false, "Usuario inexistente", nil)
@@ -199,6 +307,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				w.WriteHeader(200)
 			}
 		}
+		*/
 	case "subir":
 		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
 		if !ok {

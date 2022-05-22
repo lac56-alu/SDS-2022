@@ -71,13 +71,14 @@ func login(client *http.Client) {
 	respuesta := srv.Resp{}
 	json.NewDecoder(r.Body).Decode(&respuesta)
 
-	if r.StatusCode == 202 {
+	if r.StatusCode == 404 {
 		fmt.Println("No existe usuario con datos introducidos")
 	} else {
-		if r.StatusCode == 203 {
+		if r.StatusCode == 401 {
 			fmt.Println("Credenciales Invalidas")
 		} else {
 			if r.StatusCode == 200 {
+				fmt.Println("¡Inicio sesion correcto!")
 				UserNameGlobal = usuario.Username
 				usuarioActivo.Username = usuario.Username
 				//usuarioActivo.Token = util.Decode64(string(respuesta.Token))

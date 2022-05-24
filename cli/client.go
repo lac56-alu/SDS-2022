@@ -27,8 +27,9 @@ func chk(e error) {
 }
 
 type CurrentUser struct {
-	Username string `json:"userName"`
-	Token    []byte `json:"Token"`
+	Username  string `json:"userName"`
+	Token     []byte `json:"Token"`
+	publicKey string `json:"publicKey"`
 }
 
 var usuarioActivo CurrentUser = CurrentUser{}
@@ -181,7 +182,7 @@ func crearFichero(client *http.Client) {
 	data := url.Values{}
 	data.Set("cmd", "create")
 	data.Set("userName", util.Encode64([]byte(usuarioActivo.Username)))
-	data.Set("NombreFichero", fichero)
+	data.Set("NombreFichero", util.Encode64([]byte(fichero)))
 	data.Set("Texto", util.Encode64([]byte(texto)))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
@@ -190,6 +191,10 @@ func crearFichero(client *http.Client) {
 	} else {
 		if r.StatusCode == 201 {
 			fmt.Println("No ha sido posible crear el fichero")
+		} else {
+			if r.StatusCode == 404 {
+				fmt.Println("No se ha encontrado al usuario")
+			}
 		}
 	}
 }

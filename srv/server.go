@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +22,8 @@ import (
 //Almacenamiento de datos
 //var usuariosRegistrados []user
 var claveServidor = ""
+
+var KeysServer *rsa.PrivateKey
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -58,9 +61,44 @@ type respuestaServer struct {
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
 
+func ComprobarToken(us string, tk []byte) bool {
+	var comprobarToken bool = false
+	var comprobarUsuarioBool bool = false
+	usLog := us
+	//fmt.Println("\n Nombre del usuario: ", usLog)
+
+	var u = user{}
+
+	for name := range gUsers {
+		var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+		//fmt.Println("\n Variable del Decrypt: ", c)
+		//fmt.Println("Variable LogIn: ", usLog)
+
+		if usLog == c {
+			u = gUsers[name]
+			comprobarUsuarioBool = true
+		}
+	}
+
+	if comprobarUsuarioBool {
+		if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+			return comprobarToken
+		} else if bytes.EqualFold(u.Token, tk) {
+			comprobarToken = true
+		}
+	}
+
+	return comprobarToken
+}
+
 // gestiona el modo servidor
 func Run(clave string) {
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
+
+	var err error
+	KeysServer, err = rsa.GenerateKey(rand.Reader, 4096) // se puede observar como tarda un poquito en generar
+	chk(err)
+	KeysServer.Precompute()
 
 	//Leemos y almacenamos la clave que va a usar el servidor
 	claveServidor = clave
@@ -461,6 +499,19 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 		}
+	case "verificar":
+		us := req.Form.Get("userName")
+		tk := req.Form.Get("token")
+		comprobar := ComprobarToken(us, util.Decode64(tk))
+
+		if !comprobar {
+			w.WriteHeader(402)
+			response(w, false, "Token Expirado", nil)
+		} else {
+			w.WriteHeader(200)
+			response(w, true, "Token Correcto", nil)
+		}
+
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}

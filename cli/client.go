@@ -82,6 +82,7 @@ func login(client *http.Client) {
 				fmt.Println("¡Inicio sesion correcto!")
 				UserNameGlobal = usuario.Username
 				usuarioActivo.Username = usuario.Username
+				usuarioActivo.Token = respuesta.Token
 				//usuarioActivo.Token = util.Decode64(string(respuesta.Token))
 
 				menuSecundario(client)
@@ -171,6 +172,29 @@ func registro(client *http.Client) {
 	}
 	r.Body.Close()
 }
+
+func verificarLogIn(client *http.Client) bool {
+	var verificar bool = false
+	data := url.Values{}
+	data.Set("cmd", "verificar")
+	data.Set("userName", usuarioActivo.Username)
+	data.Set("token", util.Encode64(usuarioActivo.Token))
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	respuesta := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&respuesta)
+
+	if r.StatusCode == 402 {
+		fmt.Println("\nTu token ha expirado, realice de nuevo el LogIn")
+	} else if r.StatusCode == 200 {
+		fmt.Println("\nEsta autorizado")
+		verificar = true
+	}
+
+	r.Body.Close()
+	return verificar
+}
+
 func crearFichero(client *http.Client) {
 	fmt.Print("Nombre Fichero: ")
 	var fichero string
@@ -198,6 +222,7 @@ func crearFichero(client *http.Client) {
 		}
 	}
 }
+
 func subirFichero(client *http.Client) {
 	/*
 		1) pasarle la ubicacion del archivo y el nombre
@@ -236,6 +261,7 @@ func subirFichero(client *http.Client) {
 		}
 	}
 }
+
 func listarFichero(client *http.Client) {
 	/*
 		1) buscar la carpeta del usuario == userName
@@ -261,6 +287,7 @@ func listarFichero(client *http.Client) {
 	}
 
 }
+
 func verFichero(client *http.Client) {
 	/*
 		1) metemos el nombre del fichero que queremos ver
@@ -289,6 +316,7 @@ func verFichero(client *http.Client) {
 	}
 	r.Body.Close()
 }
+
 func compartirFichero(client *http.Client) {
 	/*
 		1) pedimos el nombre del fichero que queremos compartir (comprobamos)
@@ -320,6 +348,7 @@ func compartirFichero(client *http.Client) {
 	r.Body.Close()
 
 }
+
 func comentar(client *http.Client) {
 	/*
 		hay que darle acceso al archivo de la carpeta del usuario origen
@@ -329,6 +358,7 @@ func comentar(client *http.Client) {
 		struct: id fichero, contenido, usuarios compartidos, comentarios
 	*/
 }
+
 func descargar(client *http.Client) {
 	/*
 		1) pedimos el nombre del fichero (comprobamos dentro de la carpeta)
@@ -341,6 +371,11 @@ func menuSecundario(client *http.Client) {
 	volver := false
 	var eleccion int
 	for volver == false {
+		if !verificarLogIn(client) {
+			volver = true
+			break
+		}
+
 		fmt.Println(" 1. Crear Fichero")
 		fmt.Println(" 2. Subir Fichero")
 		fmt.Println(" 3. Listar ficheros")

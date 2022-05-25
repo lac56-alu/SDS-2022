@@ -4,6 +4,7 @@ Cliente
 package cli
 
 import (
+	"bufio"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
@@ -12,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"sdshttp/srv"
 	"sdshttp/util"
 	"syscall"
@@ -159,13 +161,14 @@ func crearFichero(client *http.Client) {
 	fmt.Scanln(&fichero)
 	fmt.Print("Texto: ")
 	var texto string
-	fmt.Scanln(&texto)
+	reader := bufio.NewReader(os.Stdin)
+	texto, _ = reader.ReadString('\n')
 
 	data := url.Values{}
 	data.Set("cmd", "create")
 	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
 	data.Set("NombreFichero", fichero)
-	data.Set("Texto", util.Encode64([]byte(texto)))
+	data.Set("Texto", texto)
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	if r.StatusCode == 200 {
@@ -220,6 +223,18 @@ func listarFichero(client *http.Client) {
 		2) guardar array o vector los nombre de todos los ficheros que tenga
 		3) mostrar todos los nombres
 	*/
+	data := url.Values{}
+	data.Set("cmd", "listar")
+	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	r, _ := client.PostForm("https://localhost:10443", data)
+
+	if r.StatusCode == 205 {
+		fmt.Println("No existe carpeta con el nombre de usuario")
+	} else {
+		respuesta := srv.Resp{}
+		json.NewDecoder(r.Body).Decode(&respuesta)
+		fmt.Print(respuesta.Msg)
+	}
 }
 func verFichero(client *http.Client) {
 	/*
@@ -244,7 +259,7 @@ func verFichero(client *http.Client) {
 		} else {
 			respuesta := srv.Resp{}
 			json.NewDecoder(r.Body).Decode(&respuesta)
-			fmt.Println(string(util.Decode64(respuesta.Msg)))
+			fmt.Println(respuesta.Msg)
 		}
 	}
 	r.Body.Close()
@@ -295,6 +310,38 @@ func descargar(client *http.Client) {
 		2) pedimos la ubicacion donde quiere copiar el archivo
 		3) copiamos el archivo en la ubicacion del usuario
 	*/
+	fmt.Print("Nombre Fichero: ")
+	var fichero string
+	fmt.Scanln(&fichero)
+	fmt.Print("Ubicacion: ")
+	var ubi string
+	fmt.Scanln(&ubi)
+	data := url.Values{}
+	data.Set("cmd", "descargar")
+	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("Ubi", ubi)
+	data.Set("NombreFichero", fichero)
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	if r.StatusCode == 205 {
+		fmt.Println("No existe su carpeta en el sevidor")
+	} else {
+		if r.StatusCode == 206 {
+			fmt.Println("No existe fichero con el nombre introducido")
+		} else {
+			if r.StatusCode == 204 {
+				fmt.Println("No existe la ubicacion introducida")
+			} else {
+				if r.StatusCode == 201 {
+					fmt.Println("No se ha podido guardar el fichero")
+				} else {
+					fmt.Println("Fichero descargado correctamente")
+				}
+			}
+		}
+	}
+	r.Body.Close()
+
 }
 
 func menuSecundario(client *http.Client) {

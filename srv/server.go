@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,7 +22,7 @@ import (
 //var usuariosRegistrados []user
 var claveServidor = ""
 
-var KeysServer *rsa.PrivateKey
+//var KeysServer *rsa.PrivateKey
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -77,8 +76,11 @@ func ComprobarToken(us string, tk []byte) bool {
 		if usLog == c {
 			u = gUsers[name]
 			comprobarUsuarioBool = true
+			break
 		}
 	}
+	//fmt.Println("\nToken (u.token): ", u.Token)
+	//fmt.Println("\nToken (tk): ", tk)
 
 	if comprobarUsuarioBool {
 		if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
@@ -91,14 +93,22 @@ func ComprobarToken(us string, tk []byte) bool {
 	return comprobarToken
 }
 
+/*
+func enviarPK() []byte {
+	clavePK := x509.MarshalPKCS1PublicKey(&KeysServer.PublicKey)
+	return clavePK
+}
+*/
+
 // gestiona el modo servidor
 func Run(clave string) {
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
 
-	var err error
+	/*var err error
 	KeysServer, err = rsa.GenerateKey(rand.Reader, 4096) // se puede observar como tarda un poquito en generar
 	chk(err)
 	KeysServer.Precompute()
+	*/
 
 	//Leemos y almacenamos la clave que va a usar el servidor
 	claveServidor = clave
@@ -107,7 +117,7 @@ func Run(clave string) {
 	http.HandleFunc("/", handler) // asignamos un handler global
 
 	//Mis llamadas
-	http.HandleFunc("/register", registro)
+	//http.HandleFunc("/register", registro)
 	//http.HandleFunc("/login", login)
 
 	// escuchamos el puerto 10443 con https y comprobamos el error
@@ -138,6 +148,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
+				break
 			}
 		}
 
@@ -163,7 +174,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				u.Seen = time.Now()        // asignamos tiempo de login
 				u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
 				rand.Read(u.Token)         // el token es aleatorio
-				gUsers[u.Name] = u
+				gUsers[u.Username] = u
+				//fmt.Println("\nToken del LogIn: ", u.Token)
 				response(w, true, "Credenciales válidas", u.Token)
 				w.WriteHeader(200)
 			}
@@ -195,7 +207,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		usernameRegistro := req.Form.Get("username")
 		passRegistro := req.Form.Get("pass")
 		emailRegistro := req.Form.Get("email")
-		keyDataRegistro := req.Form.Get("keyData")
+		//keyDataRegistro := req.Form.Get("keyData")
 		publicKeyRegistro := req.Form.Get("publicKey")
 		privateKeyRegistro := req.Form.Get("privateKey")
 
@@ -227,7 +239,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Data = make(map[string]string)                                                                                 // reservamos mapa de datos de usuario
 		u.Data["private"] = util.Encode64(util.Encrypt(util.Decode64(privateKeyRegistro), util.Decode64(claveServidor))) // clave privada
 		u.Data["public"] = util.Encode64(util.Encrypt(util.Decode64(publicKeyRegistro), util.Decode64(claveServidor)))   // clave pública
-		u.Data["keyData"] = util.Encode64(util.Encrypt(util.Decode64(keyDataRegistro), util.Decode64(claveServidor)))
+		//u.Data["keyData"] = util.Encode64(util.Encrypt(util.Decode64(keyDataRegistro), util.Decode64(claveServidor)))
 		password := util.Decode64(passRegistro) // contraseña (keyLogin)
 		// Argon2
 		u.Hash = argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
@@ -502,6 +514,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	case "verificar":
 		us := req.Form.Get("userName")
 		tk := req.Form.Get("token")
+		//fmt.Println("\nToken SIN Encode: ", tk)
+		//fmt.Println("\nToken CON Encode: ", util.Decode64(tk))
 		comprobar := ComprobarToken(us, util.Decode64(tk))
 
 		if !comprobar {
@@ -511,7 +525,12 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(200)
 			response(w, true, "Token Correcto", nil)
 		}
+	/*case "pedirPK":
+	clavePK := x509.MarshalPKCS1PublicKey(&KeysServer.PublicKey)
 
+	w.WriteHeader(200)
+	response(w, true, "PublicKey obtenida", clavePK)
+	*/
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
@@ -533,14 +552,4 @@ func response(w io.Writer, ok bool, msg string, token []byte) {
 	rJSON, err := json.Marshal(&r)            // codificamos en JSON
 	chk(err)                                  // comprobamos error
 	w.Write(rJSON)                            // escribimos el JSON resultante
-}
-
-//Mis llamadas
-func registro(w http.ResponseWriter, req *http.Request) {
-
-	/*var usuario User1
-	json.NewDecoder(req.Body).Decode(&usuario)
-
-	fmt.Printf("\nNombre Usuario: %q", usuario.Nombre)
-	*/
 }

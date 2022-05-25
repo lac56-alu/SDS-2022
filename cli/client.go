@@ -27,9 +27,9 @@ func chk(e error) {
 }
 
 type CurrentUser struct {
-	Username  string `json:"userName"`
-	Token     []byte `json:"Token"`
-	publicKey string `json:"publicKey"`
+	Username string `json:"userName"`
+	Token    []byte `json:"Token"`
+	KeyData  []byte `json:"KeyData"`
 }
 
 var usuarioActivo CurrentUser = CurrentUser{}
@@ -60,10 +60,10 @@ func login(client *http.Client) {
 	}
 	passs := string(bytePassword)
 	hash := sha512.Sum512([]byte(passs))
-	pass := hash[:32] // una mitad para el login (256 bits)
-	//keyData := hash[32:64] // la otra para los datos (256 bits)
+	pass := hash[:32]      // una mitad para el login (256 bits)
+	keyData := hash[32:64] // la otra para los datos (256 bits)
 	usuario.Password = util.Encode64(pass)
-	usuario.Username = util.Encode64([]byte(usernameLogin))
+	usuario.Username = usernameLogin
 	data := url.Values{}
 	data.Set("cmd", "login")
 	data.Set("userName", usuario.Username)
@@ -83,6 +83,8 @@ func login(client *http.Client) {
 				UserNameGlobal = usuario.Username
 				usuarioActivo.Username = usuario.Username
 				usuarioActivo.Token = respuesta.Token
+				usuarioActivo.KeyData = keyData
+				//fmt.Println("\nTu TOKEN:", respuesta.Token)
 				//usuarioActivo.Token = util.Decode64(string(respuesta.Token))
 
 				menuSecundario(client)
@@ -152,11 +154,11 @@ func registro(client *http.Client) {
 
 	data := url.Values{} // estructura para contener los valores
 	data.Set("cmd", "registro")
-	data.Set("nombre", util.Encode64([]byte(usuario.Nombre)))
-	data.Set("username", util.Encode64([]byte(usuario.Username)))
+	data.Set("nombre", util.Encode64(util.Encrypt(util.Decode64(usuario.Nombre), keyData)))
+	data.Set("username", usuario.Username)
 	data.Set("pass", usuario.Password)
-	data.Set("email", util.Encode64([]byte(usuario.Email)))
-	data.Set("keyData", usuario.keyData)
+	data.Set("email", util.Encode64(util.Encrypt(util.Decode64(usuario.Email), keyData)))
+	//data.Set("keyData", usuario.keyData)
 	data.Set("publicKey", usuario.publicKey)
 	data.Set("privateKey", usuario.privateKey)
 
@@ -179,6 +181,8 @@ func verificarLogIn(client *http.Client) bool {
 	data.Set("cmd", "verificar")
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("token", util.Encode64(usuarioActivo.Token))
+	fmt.Println("\nToken SIN Encode: ", usuarioActivo.Token)
+	fmt.Println("\nToken CON Encode: ", util.Encode64(usuarioActivo.Token))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	respuesta := srv.Resp{}
@@ -194,6 +198,30 @@ func verificarLogIn(client *http.Client) bool {
 	r.Body.Close()
 	return verificar
 }
+
+/*
+func pedirClavePublica(client *http.Client) []byte {
+	var clave []byte
+	data := url.Values{}
+	data.Set("cmd", "pedirPK")
+	if !verificarLogIn(client) {
+		fmt.Println("\nAcceso denegado")
+		return clave
+	}
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	respuesta := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&respuesta)
+
+	if r.StatusCode == 200 {
+		fmt.Println("\nKey obtenida correctamente")
+		clave = respuesta.Token
+	}
+	r.Body.Close()
+
+	return clave
+}
+*/
 
 func crearFichero(client *http.Client) {
 	fmt.Print("Nombre Fichero: ")
@@ -440,6 +468,7 @@ func menuInicio(client *http.Client) {
 			break
 		case 3:
 			salir = true
+			usuarioActivo = CurrentUser{}
 			break
 		default:
 			fmt.Println(" >>> Elige una de las opciones")

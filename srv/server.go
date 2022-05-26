@@ -379,6 +379,8 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			path := "F:\\ServidorSDS\\" + u.Name
 			us := string(util.Decode64(u.Name))
 			//path := "C:\\ServidorSDS"
+			us := string(util.Decode64(u.Username))
+			path := "C:\\ServidorSDS"
 			_, erro := os.Stat(path)
 			if os.IsNotExist(erro) {
 				erro = os.Mkdir(path, 0755)
@@ -394,7 +396,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				fmt.Println(path)
 				return
 			} else {
-				fmt.Fprintln(f, texto)
+				fmt.Println(texto)
+				err := os.WriteFile(path+"\\"+nom+".txt", []byte(texto), 0644)
+				//fmt.Fprintln(f, bufio.NewScanner(texto))
+				if err != nil {
+					w.WriteHeader(207)
+					return
+				}
 				f.Close()
 				w.WriteHeader(200)
 			}
@@ -613,9 +621,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				return
 			} else {
 				nom := req.Form.Get("NombreFichero")
-
-				//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
-				path := "F:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+				path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
 				_, erro := os.Stat(path)
 				if os.IsNotExist(erro) {
 					w.WriteHeader(205)
@@ -638,7 +644,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 					if os.IsNotExist(erro) {
 						erro = os.Mkdir(path, 0755)
 					}
-					path += "\\" + string(util.Decode64(ud.Name))
+					path += "\\" + string(util.Decode64(ud.Username))
 					_, ero := os.Stat(path)
 					if os.IsNotExist(ero) {
 						ero = os.Mkdir(path, 0755)
@@ -674,6 +680,72 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(200)
 	response(w, true, "PublicKey obtenida", clavePK)
 	*/
+	case "listar":
+		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+		if !ok {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+			path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
+			_, erro := os.Stat(path)
+			if os.IsNotExist(erro) {
+				w.WriteHeader(205)
+				return
+			}
+			listado, err := os.ReadDir(path)
+			if err != nil {
+				w.WriteHeader(211)
+				return
+			}
+			lista := "Tus ficheros son: \n"
+			for i := 0; i < len(listado); i++ {
+				lista += listado[i].Name() + "\n"
+			}
+			response(w, true, lista, nil)
+		}
+	case "descargar":
+		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+		if !ok {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(202)
+			return
+		} else {
+			nom := req.Form.Get("NombreFichero")
+			path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
+			_, erro := os.Stat(path)
+			if os.IsNotExist(erro) {
+				w.WriteHeader(205)
+				return
+			}
+			f, err := os.Open(path + "\\" + nom + ".txt")
+			if err != nil {
+				w.WriteHeader(206)
+				return
+			} else {
+				text := ""
+				escan := bufio.NewScanner(f)
+				for escan.Scan() {
+					text += escan.Text() + "\n"
+				}
+				f.Close()
+				path := req.Form.Get("Ubi")
+				_, erro := os.Stat(path)
+				if os.IsNotExist(erro) {
+					w.WriteHeader(204)
+					return
+				}
+				f, err := os.Create(path + "\\" + nom + ".txt")
+				if err != nil {
+					w.WriteHeader(201)
+					return
+				} else {
+					fmt.Fprintln(f, text)
+					f.Close()
+				}
+			}
+
+		}
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}

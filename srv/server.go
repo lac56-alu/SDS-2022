@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"sdshttp/util"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/argon2"
@@ -230,7 +231,13 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 		u.Name = util.Encode64(util.Encrypt(util.Decode64(nombreRegistro), util.Decode64(claveServidor)))
 		u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
-		u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+
+		var aux = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+		for ok := true; ok; ok = strings.ContainsAny(aux, "/") {
+			aux = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+		}
+		u.Username = aux
+
 		fmt.Println("\nTu nombre:", u.Name)
 		fmt.Println("\nTu email:", u.Email)
 		fmt.Println("\nTu contraseña:", u.Username)
@@ -332,17 +339,23 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				ero = os.Mkdir(path, 0755)
 			}
 
-			var nameFile string = util.Encode64(util.Encrypt([]byte(nom), util.Decode64(claveServidor)))
+			//var nameFile string = util.Encode64(util.Encrypt([]byte(nom), util.Decode64(claveServidor)))
+			var aux = util.Encode64(util.Encrypt([]byte(nom), util.Decode64(claveServidor)))
+			for ok := true; ok; ok = strings.ContainsAny(aux, "/") {
+				aux = util.Encode64(util.Encrypt([]byte(nom), util.Decode64(claveServidor)))
+			}
+
 			//fmt.Println("NameFile: ", nameFile)
 			//aux := base64.StdEncoding.EncodeToString([]byte(nameFile))
-			f, err := os.Create(path + "/" + nameFile + ".txt")
+			f, err := os.Create(path + "/" + aux + ".txt")
 
 			if err != nil {
 				w.WriteHeader(201)
 				fmt.Println("Error: ", path)
 				return
 			} else {
-				fmt.Fprintln(f, texto)
+				//fmt.Fprintln(f, texto)
+				f.WriteString(texto)
 				f.Close()
 				w.WriteHeader(200)
 			}
@@ -536,8 +549,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		} else {
 			nom := req.Form.Get("NombreFichero")
 			//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
-			path := "F:\\ServidorSDS\\" + u.Username
+			path := "./ServidorSDS/" + u.Username
 			_, erro := os.Stat(path)
+
 			if os.IsNotExist(erro) {
 				w.WriteHeader(205)
 				return
@@ -552,8 +566,14 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			var nombreFicheroCifrado string
 
 			for i := 0; i < len(listado); i++ {
+				longitudNombre := len(listado[i].Name()) - 4
+				cadena := listado[i].Name()[0:longitudNombre]
 
-				if nom == util.Encode64(util.Decrypt(util.Decode64(listado[i].Name()), util.Decode64(claveServidor))) {
+				aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+				//var aux2 = []byte(nom)
+				aux2 := string(util.Decode64(aux))
+
+				if nom == aux2 {
 					nombreFicheroCifrado = listado[i].Name()
 					break
 				}
@@ -562,18 +582,20 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			if nombreFicheroCifrado == "" {
 				return
 			} else {
-				f, err := os.Open(path + "\\" + nom + ".txt")
+				f, err := os.Open(path + "/" + nombreFicheroCifrado)
 				if err != nil {
 					w.WriteHeader(203)
 				} else {
 					text := ""
 					escan := bufio.NewScanner(f)
 					for escan.Scan() {
-						text += escan.Text() + "\n"
+						text += escan.Text()
 					}
 					f.Close()
-					textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
-					response(w, true, textoSinCifrar, nil)
+
+					//textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
+					//auxTexto := string(util.Decode64(textoSinCifrar))
+					response(w, true, text, nil)
 				}
 			}
 

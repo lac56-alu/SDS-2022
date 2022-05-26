@@ -236,6 +236,7 @@ func crearFichero(client *http.Client) {
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
 	data.Set("Texto", util.Encode64(util.Encrypt([]byte(texto), usuarioActivo.KeyData)))
+	fmt.Println("Texto Encriptado: ", data.Get("Texto"))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	if r.StatusCode == 200 {
@@ -327,7 +328,7 @@ func verFichero(client *http.Client) {
 	fmt.Scanln(&fichero)
 	data := url.Values{}
 	data.Set("cmd", "ver")
-	data.Set("userName", UserNameGlobal)
+	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
 
 	r, _ := client.PostForm("https://localhost:10443", data)
@@ -339,7 +340,11 @@ func verFichero(client *http.Client) {
 		} else {
 			respuesta := srv.Resp{}
 			json.NewDecoder(r.Body).Decode(&respuesta)
-			fmt.Println(string(util.Decode64(respuesta.Msg)))
+			textoCifrado := respuesta.Msg
+			textoBien := util.Encode64(util.Decrypt(util.Decode64(textoCifrado), usuarioActivo.KeyData))
+			auxTexto := string(util.Decode64(textoBien))
+
+			fmt.Println("El contenido del fichero es: ", auxTexto)
 		}
 	}
 	r.Body.Close()

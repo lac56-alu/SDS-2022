@@ -181,8 +181,8 @@ func verificarLogIn(client *http.Client) bool {
 	data.Set("cmd", "verificar")
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("token", util.Encode64(usuarioActivo.Token))
-	fmt.Println("\nToken SIN Encode: ", usuarioActivo.Token)
-	fmt.Println("\nToken CON Encode: ", util.Encode64(usuarioActivo.Token))
+	//fmt.Println("\nToken SIN Encode: ", usuarioActivo.Token)
+	//fmt.Println("\nToken CON Encode: ", util.Encode64(usuarioActivo.Token))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	respuesta := srv.Resp{}
@@ -233,9 +233,9 @@ func crearFichero(client *http.Client) {
 
 	data := url.Values{}
 	data.Set("cmd", "create")
-	data.Set("userName", util.Encode64([]byte(usuarioActivo.Username)))
-	data.Set("NombreFichero", util.Encode64([]byte(fichero)))
-	data.Set("Texto", util.Encode64([]byte(texto)))
+	data.Set("userName", usuarioActivo.Username)
+	data.Set("NombreFichero", fichero)
+	data.Set("Texto", util.Encode64(util.Encrypt([]byte(texto), usuarioActivo.KeyData)))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	if r.StatusCode == 200 {
@@ -266,7 +266,7 @@ func subirFichero(client *http.Client) {
 
 	data := url.Values{}
 	data.Set("cmd", "subir")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
 	data.Set("Ubicacion", ubi)
 
@@ -327,7 +327,7 @@ func verFichero(client *http.Client) {
 	fmt.Scanln(&fichero)
 	data := url.Values{}
 	data.Set("cmd", "ver")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("userName", UserNameGlobal)
 	data.Set("NombreFichero", fichero)
 
 	r, _ := client.PostForm("https://localhost:10443", data)

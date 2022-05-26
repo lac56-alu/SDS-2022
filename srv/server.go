@@ -286,7 +286,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		*/
 	case "create":
 		var comprobarUsuarioBool bool = false
-		usLog := string(util.Decode64(req.Form.Get("userName")))
+		usLog := req.Form.Get("userName")
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -301,6 +301,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			if usLog == c {
 				u = gUsers[name]
 				comprobarUsuarioBool = true
+				break
 			}
 		}
 
@@ -314,21 +315,28 @@ func handler(w http.ResponseWriter, req *http.Request) {
 
 			texto := req.Form.Get("Texto")
 			nom := req.Form.Get("NombreFichero")
-			us := u.Name
+			us := u.Username
 			//path := "C:\\ServidorSDS"
-			path := "F:\\ServidorSDS"
+			path := "./ServidorSDS"
 
 			_, erro := os.Stat(path)
 
 			if os.IsNotExist(erro) {
+				w.WriteHeader(404)
 				erro = os.Mkdir(path, 0755)
 			}
-			path += "\\" + us
+			path += "/" + us
 			_, ero := os.Stat(path)
 			if os.IsNotExist(ero) {
+				w.WriteHeader(500)
 				ero = os.Mkdir(path, 0755)
 			}
-			f, err := os.Create(path + "\\" + nom + ".txt")
+
+			var nameFile string = util.Encode64(util.Encrypt([]byte(nom), util.Decode64(claveServidor)))
+			//fmt.Println("NameFile: ", nameFile)
+			//aux := base64.StdEncoding.EncodeToString([]byte(nameFile))
+			f, err := os.Create(path + "/" + nameFile + ".txt")
+
 			if err != nil {
 				w.WriteHeader(201)
 				fmt.Println("Error: ", path)
@@ -380,10 +388,30 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		}
 		*/
 	case "subir":
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			//fmt.Println("\n Variable del Decrypt: ", c)
+			//fmt.Println("Variable Usuario: ", usLog)
+
+			if usLog == c {
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
 			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
 			ubi := req.Form.Get("Ubicacion")
@@ -405,57 +433,150 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				}
 				f.Close()
 				//pathh := "C:\\ServidorSDS"
-				pathh := "F:\\ServidorSDS"
+				pathh := "./ServidorSDS/"
 				_, erro := os.Stat(pathh)
 				if os.IsNotExist(erro) {
 					erro = os.Mkdir(pathh, 0755)
 				}
-				pathh += "\\" + string(util.Decode64(u.Name))
+				pathh += u.Username
 				_, ero := os.Stat(pathh)
 				if os.IsNotExist(ero) {
 					ero = os.Mkdir(pathh, 0755)
 				}
-				f, err := os.Create(pathh + "\\" + nom + ".txt")
+				aux := util.Encode64(util.Encrypt([]byte(nom), util.Decode64(claveServidor)))
+				f, err := os.Create(pathh + "/" + string(aux) + ".txt")
+
 				if err != nil {
+					fmt.Println("Disgustoooooooooooo")
 					w.WriteHeader(201)
 					return
 				} else {
-					fmt.Fprintln(f, util.Encode64([]byte(text)))
+					fmt.Fprintln(f, util.Encode64(util.Encrypt([]byte(text), util.Decode64(claveServidor))))
 					f.Close()
 					w.WriteHeader(200)
 				}
 
 			}
-
 		}
+
+		/*
+			u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
+			if !ok {
+				//response(w, false, "Usuario inexistente", nil)
+				w.WriteHeader(202)
+				return
+			} else {
+				ubi := req.Form.Get("Ubicacion")
+				nom := req.Form.Get("NombreFichero")
+				path := ubi
+				_, erro := os.Stat(path)
+				if os.IsNotExist(erro) {
+					w.WriteHeader(205)
+					return
+				}
+				f, err := os.Open(path + "\\" + nom + ".txt")
+				if err != nil {
+					w.WriteHeader(203)
+				} else {
+					text := ""
+					escan := bufio.NewScanner(f)
+					for escan.Scan() {
+						text += escan.Text() + "\n"
+					}
+					f.Close()
+					//pathh := "C:\\ServidorSDS"
+					pathh := "F:\\ServidorSDS"
+					_, erro := os.Stat(pathh)
+					if os.IsNotExist(erro) {
+						erro = os.Mkdir(pathh, 0755)
+					}
+					pathh += "\\" + string(util.Decode64(u.Name))
+					_, ero := os.Stat(pathh)
+					if os.IsNotExist(ero) {
+						ero = os.Mkdir(pathh, 0755)
+					}
+					f, err := os.Create(pathh + "\\" + nom + ".txt")
+					if err != nil {
+						w.WriteHeader(201)
+						return
+					} else {
+						fmt.Fprintln(f, util.Encode64([]byte(text)))
+						f.Close()
+						w.WriteHeader(200)
+					}
+
+				}
+		*/
 	case "ver":
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			//fmt.Println("\n Variable del Decrypt: ", c)
+			//fmt.Println("Variable Usuario: ", usLog)
+
+			if usLog == c {
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
 			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
-
 			nom := req.Form.Get("NombreFichero")
 			//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
-			path := "F:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+			path := "F:\\ServidorSDS\\" + u.Username
 			_, erro := os.Stat(path)
 			if os.IsNotExist(erro) {
 				w.WriteHeader(205)
 				return
 			}
-			f, err := os.Open(path + "\\" + nom + ".txt")
+
+			listado, err := os.ReadDir(path)
 			if err != nil {
-				w.WriteHeader(203)
-			} else {
-				text := ""
-				escan := bufio.NewScanner(f)
-				for escan.Scan() {
-					text += escan.Text() + "\n"
-				}
-				f.Close()
-				response(w, true, text, nil)
+				w.WriteHeader(211)
+				return
 			}
+
+			var nombreFicheroCifrado string
+
+			for i := 0; i < len(listado); i++ {
+
+				if nom == util.Encode64(util.Decrypt(util.Decode64(listado[i].Name()), util.Decode64(claveServidor))) {
+					nombreFicheroCifrado = listado[i].Name()
+					break
+				}
+			}
+
+			if nombreFicheroCifrado == "" {
+				return
+			} else {
+				f, err := os.Open(path + "\\" + nom + ".txt")
+				if err != nil {
+					w.WriteHeader(203)
+				} else {
+					text := ""
+					escan := bufio.NewScanner(f)
+					for escan.Scan() {
+						text += escan.Text() + "\n"
+					}
+					f.Close()
+					textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
+					response(w, true, textoSinCifrar, nil)
+				}
+			}
+
 		}
 	case "compartir":
 		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?

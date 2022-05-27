@@ -302,7 +302,7 @@ func listarFichero(client *http.Client) {
 	*/
 	data := url.Values{}
 	data.Set("cmd", "listar")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("userName", usuarioActivo.Username)
 	r, _ := client.PostForm("https://localhost:10443", data)
 
 	if r.StatusCode == 205 {
@@ -310,7 +310,7 @@ func listarFichero(client *http.Client) {
 	} else {
 		respuesta := srv.Resp{}
 		json.NewDecoder(r.Body).Decode(&respuesta)
-		fmt.Print(respuesta.Msg)
+		fmt.Println(respuesta.Msg)
 	}
 }
 

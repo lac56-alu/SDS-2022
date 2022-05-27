@@ -468,7 +468,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				f, err := os.Create(pathh + "/" + string(aux) + ".txt")
 
 				if err != nil {
-					fmt.Println("Disgustoooooooooooo")
+					//fmt.Println("Disgustoooooooooooo")
 					w.WriteHeader(201)
 					return
 				} else {
@@ -681,26 +681,55 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	response(w, true, "PublicKey obtenida", clavePK)
 	*/
 	case "listar":
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			//fmt.Println("\n Variable del Decrypt: ", c)
+			//fmt.Println("Variable Usuario: ", usLog)
+
+			if usLog == c {
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
 			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
-			path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
+			path := "./ServidorSDS/" + u.Username
 			_, erro := os.Stat(path)
+
 			if os.IsNotExist(erro) {
 				w.WriteHeader(205)
 				return
 			}
+
 			listado, err := os.ReadDir(path)
 			if err != nil {
 				w.WriteHeader(211)
 				return
 			}
-			lista := "Tus ficheros son: \n"
+
+			var lista = "Tu lista de ficheros son: \n"
 			for i := 0; i < len(listado); i++ {
-				lista += listado[i].Name() + "\n"
+				longitudNombre := len(listado[i].Name()) - 4
+				cadena := listado[i].Name()[0:longitudNombre]
+
+				aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+				//var aux2 = []byte(nom)
+				aux2 := string(util.Decode64(aux))
+				lista += aux2 + "\n"
 			}
 			response(w, true, lista, nil)
 		}

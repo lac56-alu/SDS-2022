@@ -391,9 +391,9 @@ func comentar(client *http.Client) {
 
 func descargar(client *http.Client) {
 	/*
-		1) pedimos el nombre del fichero (comprobamos dentro de la carpeta)
-		2) pedimos la ubicacion donde quiere copiar el archivo
-		3) copiamos el archivo en la ubicacion del usuario
+	   1) pedimos el nombre del fichero (comprobamos dentro de la carpeta)
+	   2) pedimos la ubicacion donde quiere copiar el archivo
+	   3) copiamos el archivo en la ubicacion del usuario
 	*/
 	fmt.Print("Nombre Fichero: ")
 	var fichero string
@@ -403,11 +403,10 @@ func descargar(client *http.Client) {
 	fmt.Scanln(&ubi)
 	data := url.Values{}
 	data.Set("cmd", "descargar")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
-	data.Set("Ubi", ubi)
+	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
 
-	r, _ := client.PostForm("https://localhost:10443", data)
+	r, _ := client.PostForm("https://localhost:10443/", data)
 	if r.StatusCode == 205 {
 		fmt.Println("No existe su carpeta en el sevidor")
 	} else {
@@ -415,18 +414,33 @@ func descargar(client *http.Client) {
 			fmt.Println("No existe fichero con el nombre introducido")
 		} else {
 			if r.StatusCode == 204 {
-				fmt.Println("No existe la ubicacion introducida")
+				fmt.Println("No se ha podido analizar el fichero")
 			} else {
-				if r.StatusCode == 201 {
-					fmt.Println("No se ha podido guardar el fichero")
-				} else {
-					fmt.Println("Fichero descargado correctamente")
+				respuesta := srv.Resp{}
+				json.NewDecoder(r.Body).Decode(&respuesta)
+				textoCifrado := respuesta.Msg
+				textoBien := util.Encode64(util.Decrypt(util.Decode64(textoCifrado), usuarioActivo.KeyData))
+				auxTexto := string(util.Decode64(textoBien))
+				_, erro := os.Stat(ubi)
+				if os.IsNotExist(erro) {
+					fmt.Println("No existe la ubicacion introducida")
+					return
 				}
+				f, err := os.Create(ubi + "/" + fichero + ".txt")
+
+				if err != nil {
+					fmt.Println("Error: No se ha podido guardar")
+					return
+				} else {
+					f.WriteString(auxTexto)
+					f.Close()
+				}
+				fmt.Println("Fichero descargado correctamente")
+
 			}
 		}
 	}
 	r.Body.Close()
-
 }
 
 func menuSecundario(client *http.Client) {

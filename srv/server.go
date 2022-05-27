@@ -734,43 +734,82 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, true, lista, nil)
 		}
 	case "descargar":
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			//fmt.Println("\n Variable del Decrypt: ", c)
+			//fmt.Println("Variable Usuario: ", usLog)
+
+			if usLog == c {
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
 			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
 			nom := req.Form.Get("NombreFichero")
-			path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
+			//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+			path := "./ServidorSDS/" + u.Username
 			_, erro := os.Stat(path)
+
 			if os.IsNotExist(erro) {
 				w.WriteHeader(205)
 				return
 			}
-			f, err := os.Open(path + "\\" + nom + ".txt")
+
+			listado, err := os.ReadDir(path)
 			if err != nil {
+				w.WriteHeader(211)
+				return
+			}
+
+			var nombreFicheroCifrado string
+
+			for i := 0; i < len(listado); i++ {
+				longitudNombre := len(listado[i].Name()) - 4
+				cadena := listado[i].Name()[0:longitudNombre]
+
+				aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+				//var aux2 = []byte(nom)
+				aux2 := string(util.Decode64(aux))
+
+				if nom == aux2 {
+					nombreFicheroCifrado = listado[i].Name()
+					break
+				}
+			}
+
+			if nombreFicheroCifrado == "" {
 				w.WriteHeader(206)
 				return
 			} else {
-				text := ""
-				escan := bufio.NewScanner(f)
-				for escan.Scan() {
-					text += escan.Text() + "\n"
-				}
-				f.Close()
-				path := req.Form.Get("Ubi")
-				_, erro := os.Stat(path)
-				if os.IsNotExist(erro) {
-					w.WriteHeader(204)
-					return
-				}
-				f, err := os.Create(path + "\\" + nom + ".txt")
+				f, err := os.Open(path + "/" + nombreFicheroCifrado)
 				if err != nil {
-					w.WriteHeader(201)
-					return
+					w.WriteHeader(204)
 				} else {
-					fmt.Fprintln(f, text)
+					text := ""
+					escan := bufio.NewScanner(f)
+					for escan.Scan() {
+						text += escan.Text()
+					}
 					f.Close()
+
+					//textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
+					//auxTexto := string(util.Decode64(textoSinCifrar))
+					response(w, true, text, nil)
 				}
 			}
 

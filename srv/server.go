@@ -65,16 +65,20 @@ func ComprobarToken(us string, tk []byte) bool {
 	var comprobarToken bool = false
 	var comprobarUsuarioBool bool = false
 	usLog := us
-	//fmt.Println("\n Nombre del usuario: ", usLog)
+	fmt.Println("\n Nombre del usuario: ", usLog)
 
+	//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+	//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
 	var u = user{}
 
 	for name := range gUsers {
+		//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-		//fmt.Println("\n Variable del Decrypt: ", c)
-		//fmt.Println("Variable LogIn: ", usLog)
+		fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+		fmt.Println("Variable LogIn: ", usLog)
 
-		if usLog == c {
+		if usLog == string(util.Decode64(c)) {
+			//fmt.Println("\n Encuentra en el bucle")
 			u = gUsers[name]
 			comprobarUsuarioBool = true
 			break
@@ -142,10 +146,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			fmt.Println("\n Variable del Decrypt: ", c)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
 			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
 				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
@@ -213,7 +217,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		privateKeyRegistro := req.Form.Get("privateKey")
 
 		u := user{}
-		u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+		u.Username = util.Encode64(util.Encrypt([]byte(usernameRegistro), util.Decode64(claveServidor)))
 
 		for name := range gUsers {
 			var opa = util.Encode64(util.Decrypt(util.Decode64(u.Username), util.Decode64(claveServidor)))
@@ -232,9 +236,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Name = util.Encode64(util.Encrypt(util.Decode64(nombreRegistro), util.Decode64(claveServidor)))
 		u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
 
-		var aux = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+		var aux = util.Encode64(util.Encrypt([]byte(usernameRegistro), util.Decode64(claveServidor)))
 		for ok := true; ok; ok = strings.ContainsAny(aux, "/") {
-			aux = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+			aux = util.Encode64(util.Encrypt([]byte(usernameRegistro), util.Decode64(claveServidor)))
 		}
 		u.Username = aux
 
@@ -294,6 +298,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	case "create":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -302,10 +307,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -411,6 +417,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	case "subir":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -419,10 +426,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -531,6 +539,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	case "ver":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -539,10 +548,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -683,6 +693,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	case "listar":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -691,10 +702,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -736,6 +748,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 	case "descargar":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -744,10 +757,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break

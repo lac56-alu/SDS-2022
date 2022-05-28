@@ -11,7 +11,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "C:\\Users\\luis2\\Desktop\\2021 - 2022\\Segundo Cuatri\\SDS\\Practicas\\REPOSITORIO\\SDS-2022\\main.go",
-            "args": ["srv", "C:\\Users\\luis2\\Desktop\\ClaveServidorSDS\\clave.txt"],
+            "args": ["srv", "holaabruu"],
             "showLog": true
         }
     ]

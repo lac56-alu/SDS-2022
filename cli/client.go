@@ -159,7 +159,7 @@ func registro(client *http.Client) {
 	data.Set("nombre", util.Encode64(util.Encrypt(util.Decode64(usuario.Nombre), keyData)))
 	data.Set("username", usuario.Username)
 	data.Set("pass", usuario.Password)
-	data.Set("email", util.Encode64(util.Encrypt(util.Decode64(usuario.Email), keyData)))
+	data.Set("email", util.Encode64(util.Encrypt([]byte(usuario.Email), keyData)))
 	//data.Set("keyData", usuario.keyData)
 	data.Set("publicKey", usuario.publicKey)
 	data.Set("privateKey", usuario.privateKey)

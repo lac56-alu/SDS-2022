@@ -33,10 +33,14 @@ openssl req -x509 -out localhost.crt -keyout localhost.key \
 package main
 
 import (
+	"crypto/sha512"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"sdshttp/cli"
 	"sdshttp/srv"
+	"sdshttp/util"
 )
 
 func main() {
@@ -47,8 +51,23 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "srv":
+			var clave = ""
+			rutaClave := os.Args[2]
+
+			//leer la contraseña con la que vamos a cifrar toda la informacion del servidor
+			file, err := ioutil.ReadFile(rutaClave)
+			{
+				if err != nil {
+					log.Fatal(err)
+				}
+				clave = string(file)
+			}
+			//le hacemos un hash a la clave del servidor
+			hash := sha512.Sum512([]byte(clave))
+			claveServidor := hash[:32]
+
 			fmt.Println("Entrando en modo servidor...")
-			srv.Run()
+			srv.Run(util.Encode64(claveServidor))
 		case "cli":
 			fmt.Println("Entrando en modo cliente...")
 			cli.Run()

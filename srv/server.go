@@ -687,6 +687,112 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 
 		}
+	case "comentar":
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
+
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
+			return
+		} else {
+			nom := req.Form.Get("NombreFichero")
+			//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+			path := "./ServidorSDS/" + u.Username
+			_, erro := os.Stat(path)
+
+			if os.IsNotExist(erro) {
+				w.WriteHeader(403)
+				return
+			}
+
+			listado, err := os.ReadDir(path)
+			if err != nil {
+				w.WriteHeader(211)
+				return
+			}
+
+			var nombreFicheroCifrado string
+
+			for i := 0; i < len(listado); i++ {
+				longitudNombre := len(listado[i].Name()) - 4
+				cadena := listado[i].Name()[0:longitudNombre]
+
+				aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+				//var aux2 = []byte(nom)
+				aux2 := string(util.Decode64(aux))
+
+				if nom == aux2 {
+					nombreFicheroCifrado = listado[i].Name()
+					break
+				}
+			}
+
+			if nombreFicheroCifrado == "" {
+				w.WriteHeader(201)
+				return
+			} else {
+				/*f, err := os.Open(path + "/" + nombreFicheroCifrado)
+				if err != nil {
+					w.WriteHeader(203)
+				} else {
+					text := ""
+					escan := bufio.NewScanner(f)
+					for escan.Scan() {
+						text += escan.Text()
+					}
+					f.Close()
+					//textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
+					//auxTexto := string(util.Decode64(textoSinCifrar))
+					response(w, true, text, nil)
+				}*/
+				var comprobarficheroBool bool = false
+				var fic = fichero{}
+
+				for name := range gFicheros {
+					//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+					var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+					fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+					fmt.Println("Variable LogIn: ", usLog)
+
+					if nom == string(util.Decode64(c)) {
+						//fmt.Println("\n Encuentra en el bucle")
+						fic = gFicheros[name]
+						comprobarficheroBool = true
+						break
+					}
+				}
+
+				if !comprobarficheroBool {
+					return
+				} else {
+					comentario := req.Form.Get("Comentario")
+					fic.comentarios = append(fic.comentarios, comentario)
+					gFicheros[fic.Name] = fic
+				}
+			}
+
+		}
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}

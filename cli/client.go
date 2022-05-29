@@ -328,15 +328,9 @@ func verFichero(client *http.Client) {
 			//users
 			usersCifrado := respuesta.Users
 			fmt.Println("Compartido con: ")
-			var auxxxTexto string
+			//var auxxxTexto string
 			for _, u := range usersCifrado {
-				if u == "" {
-					auxxxTexto = ""
-				} else {
-					usersBien := util.Encode64(util.Decrypt(util.Decode64(u), usuarioActivo.KeyData))
-					auxxxTexto = string(util.Decode64(usersBien))
-				}
-				fmt.Println(auxxxTexto)
+				fmt.Println(u)
 			}
 		}
 	}

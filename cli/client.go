@@ -158,7 +158,7 @@ func registro(client *http.Client) {
 	data.Set("username", usuario.Username)
 	data.Set("pass", usuario.Password)
 	data.Set("email", util.Encode64(util.Encrypt([]byte(usuario.Email), keyData)))
-	//data.Set("keyData", usuario.keyData)
+
 	data.Set("publicKey", usuario.publicKey)
 	data.Set("privateKey", usuario.privateKey)
 
@@ -307,13 +307,38 @@ func verFichero(client *http.Client) {
 		if r.StatusCode == 203 {
 			fmt.Println("No existe fichero con el nombre introducido")
 		} else {
-			respuesta := srv.Resp{}
+			respuesta := srv.LecturaFic{}
 			json.NewDecoder(r.Body).Decode(&respuesta)
-			textoCifrado := respuesta.Msg
+			textoCifrado := respuesta.Content
 			textoBien := util.Encode64(util.Decrypt(util.Decode64(textoCifrado), usuarioActivo.KeyData))
 			auxTexto := string(util.Decode64(textoBien))
-
 			fmt.Println("El contenido del fichero es: ", auxTexto)
+			//Coments
+			comentsCifrado := respuesta.Coments
+			fmt.Println("Los comentarios existentes: ")
+			var auxxTexto string
+			for _, c := range comentsCifrado {
+				if c == "" {
+					auxxTexto = ""
+				} else {
+					comentsBien := util.Encode64(util.Decrypt(util.Decode64(c), usuarioActivo.KeyData))
+					auxxTexto = string(util.Decode64(comentsBien))
+				}
+				fmt.Println(auxxTexto)
+			}
+			//users
+			usersCifrado := respuesta.Users
+			fmt.Println("Compartido con: ")
+			var auxxxTexto string
+			for _, u := range usersCifrado {
+				if u == "" {
+					auxxxTexto = ""
+				} else {
+					usersBien := util.Encode64(util.Decrypt(util.Decode64(u), usuarioActivo.KeyData))
+					auxxxTexto = string(util.Decode64(usersBien))
+				}
+				fmt.Println(auxxxTexto)
+			}
 		}
 	}
 	r.Body.Close()
@@ -333,8 +358,8 @@ func compartirFichero(client *http.Client) {
 	fmt.Scanln(&usern)
 	data := url.Values{}
 	data.Set("cmd", "compartir")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
-	data.Set("usuario", util.Encode64([]byte(usern)))
+	data.Set("userName", usuarioActivo.Username)
+	data.Set("usuario", usern)
 	data.Set("NombreFichero", fichero)
 
 	r, _ := client.PostForm("https://localhost:10443", data)
@@ -344,7 +369,11 @@ func compartirFichero(client *http.Client) {
 		if r.StatusCode == 206 {
 			fmt.Println("No existe fichero con el nombre introducido")
 		} else {
-			fmt.Println("Fichero copiado correctamente")
+			if r.StatusCode == 211 {
+				fmt.Println("No existe carpeta con tu nombre")
+			} else {
+				fmt.Println("Fichero copiado correctamente")
+			}
 		}
 	}
 	r.Body.Close()
@@ -359,6 +388,32 @@ func comentar(client *http.Client) {
 		es bueno hacer un struct para controlar los archivos
 		struct: id fichero, contenido, usuarios compartidos, comentarios
 	*/
+	fmt.Print("Nombre Fichero: ")
+	var fichero string
+	fmt.Scanln(&fichero)
+	fmt.Print("Comentario: ")
+	var comen string
+	reader := bufio.NewReader(os.Stdin)
+	comen, _ = reader.ReadString('\n')
+
+	data := url.Values{}
+	data.Set("cmd", "comentar")
+	data.Set("userName", usuarioActivo.Username)
+	data.Set("NombreFichero", fichero)
+	data.Set("Comentario", util.Encode64(util.Encrypt([]byte(comen), usuarioActivo.KeyData)))
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	if r.StatusCode == 200 {
+		fmt.Println("Comentario guardado con exito")
+	} else {
+		if r.StatusCode == 201 {
+			fmt.Println("No se ha encontrado el fichero")
+		} else {
+			if r.StatusCode == 404 || r.StatusCode == 403 {
+				fmt.Println("No se ha podido encontrar directorio")
+			}
+		}
+	}
 }
 
 func descargar(client *http.Client) {

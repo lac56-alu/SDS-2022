@@ -154,7 +154,7 @@ func registro(client *http.Client) {
 
 	data := url.Values{} // estructura para contener los valores
 	data.Set("cmd", "registro")
-	data.Set("nombre", util.Encode64(util.Encrypt(util.Decode64(usuario.Nombre), keyData)))
+	data.Set("nombre", util.Encode64(util.Encrypt([]byte(usuario.Nombre), keyData)))
 	data.Set("username", usuario.Username)
 	data.Set("pass", usuario.Password)
 	data.Set("email", util.Encode64(util.Encrypt([]byte(usuario.Email), keyData)))
@@ -211,7 +211,6 @@ func crearFichero(client *http.Client) {
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
 	data.Set("Texto", util.Encode64(util.Encrypt([]byte(texto), usuarioActivo.KeyData)))
-	fmt.Println("Texto Encriptado: ", data.Get("Texto"))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	if r.StatusCode == 200 {

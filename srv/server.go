@@ -96,7 +96,6 @@ func Run(clave string) {
 
 	//Leemos y almacenamos la clave que va a usar el servidor
 	claveServidor = clave
-	fmt.Println("Clave Servidor: " + claveServidor)
 
 	http.HandleFunc("/", handler) // asignamos un handler global
 
@@ -171,10 +170,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			var opa = util.Encode64(util.Decrypt(util.Decode64(u.Username), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			fmt.Println("\nVARIBABLE u:", u.Username)
-			fmt.Println("\nVARIBABLE opa:", opa)
-			fmt.Println("\nVariable Almacen:", name)
-			fmt.Println("\nVariable Decrypt:", c)
 
 			if opa == c {
 				response(w, false, "Usuario ya registrado", nil)

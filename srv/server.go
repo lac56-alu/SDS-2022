@@ -21,6 +21,9 @@ import (
 
 //Almacenamiento de datos
 //var usuariosRegistrados []user
+var claveServidor = ""
+
+//var KeysServer *rsa.PrivateKey
 
 // chk comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func chk(e error) {
@@ -28,10 +31,6 @@ func chk(e error) {
 		panic(e)
 	}
 }
-
-type msg map[string][]byte // mapa con índice de string y slice de bytes de contenido
-
-var claveServidor = ""
 
 // ejemplo de tipo para un usuario
 type user struct {
@@ -43,6 +42,14 @@ type user struct {
 	Token    []byte            // token de sesión
 	Seen     time.Time         // última vez que fue visto
 	Data     map[string]string // datos adicionales del usuario
+}
+
+type fichero struct {
+	Name        string
+	duenyo      string
+	contenido   string
+	usuarios    []string
+	comentarios []string
 }
 
 /*type User1 struct {
@@ -61,21 +68,26 @@ type respuestaServer struct {
 // mapa con todos los usuarios
 // (se podría serializar con JSON o Gob, etc. y escribir/leer de disco para persistencia)
 var gUsers map[string]user
+var gFicheros map[string]fichero
 
 func ComprobarToken(us string, tk []byte) bool {
 	var comprobarToken bool = false
 	var comprobarUsuarioBool bool = false
 	usLog := us
-	//fmt.Println("\n Nombre del usuario: ", usLog)
+	fmt.Println("\n Nombre del usuario: ", usLog)
 
+	//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+	//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
 	var u = user{}
 
 	for name := range gUsers {
+		//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-		//fmt.Println("\n Variable del Decrypt: ", c)
-		//fmt.Println("Variable LogIn: ", usLog)
+		fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+		fmt.Println("Variable LogIn: ", usLog)
 
-		if usLog == c {
+		if usLog == string(util.Decode64(c)) {
+			//fmt.Println("\n Encuentra en el bucle")
 			u = gUsers[name]
 			comprobarUsuarioBool = true
 			break
@@ -95,15 +107,31 @@ func ComprobarToken(us string, tk []byte) bool {
 	return comprobarToken
 }
 
+/*
+func enviarPK() []byte {
+	clavePK := x509.MarshalPKCS1PublicKey(&KeysServer.PublicKey)
+	return clavePK
+}
+*/
+
 // gestiona el modo servidor
 func Run(clave string) {
 	gUsers = make(map[string]user) // inicializamos mapa de usuarios
+	gFicheros = make(map[string]fichero)
+	/*var err error
+	KeysServer, err = rsa.GenerateKey(rand.Reader, 4096) // se puede observar como tarda un poquito en generar
+	chk(err)
+	KeysServer.Precompute()
+	*/
 
+	//Leemos y almacenamos la clave que va a usar el servidor
 	claveServidor = clave
+	fmt.Println("Clave Servidor: " + claveServidor)
+
 	http.HandleFunc("/", handler) // asignamos un handler global
 
 	//Mis llamadas
-	http.HandleFunc("/register", registro)
+	//http.HandleFunc("/register", registro)
 	//http.HandleFunc("/login", login)
 
 	// escuchamos el puerto 10443 con https y comprobamos el error
@@ -113,24 +141,8 @@ func Run(clave string) {
 func handler(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()                                                   // es necesario parsear el formulario
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8") // cabecera estándar
-	/*qm := msg{}                                                       // creamos un mensaje para la petición
-
-	dec := json.NewDecoder(req.Body) // decoder json para el request
-	err := dec.Decode(&qm)           // decodificamos el msg del request
-	chk(err)
-
-	rm := msg{} */ // creamos un mensaje para la respuesta
 
 	switch req.Form.Get("cmd") { // comprobamos comando desde el cliente
-	/*case "xchg":
-	// intercambio de claves
-	rm["cmd"] = []byte("xchg")                                            // mismo comando
-	rm["status"] = []byte("OK")                                           // resultado OK
-	rm["srv_pub"] = x509.MarshalPKCS1PublicKey(&ctxSrv.privKey.PublicKey) // clave pública como argumento (necesario x509 para pasar a []byte)
-
-	// extraemos la clave pública del cliente
-	ctxSrv.cliPubKey, err = x509.ParsePKCS1PublicKey(qm["cli_pub"]) // necesario x509 para obtener de []byte
-	chk(err)*/
 	case "login": // ** login
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
@@ -143,10 +155,10 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			fmt.Println("\n Variable del Decrypt: ", c)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
 			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
 				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
@@ -178,8 +190,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				rand.Read(u.Token)         // el token es aleatorio
 				gUsers[u.Username] = u
 				//fmt.Println("\nToken del LogIn: ", u.Token)
-				privadaU := util.Encode64(util.Decrypt(util.Decode64(u.Data["private"]), util.Decode64(claveServidor)))
-				response(w, true, privadaU, u.Token)
+				response(w, true, "Credenciales válidas", u.Token)
 				w.WriteHeader(200)
 			}
 		}
@@ -215,7 +226,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		privateKeyRegistro := req.Form.Get("privateKey")
 
 		u := user{}
-		u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+		u.Username = util.Encode64(util.Encrypt([]byte(usernameRegistro), util.Decode64(claveServidor)))
 
 		for name := range gUsers {
 			var opa = util.Encode64(util.Decrypt(util.Decode64(u.Username), util.Decode64(claveServidor)))
@@ -234,9 +245,9 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		u.Name = util.Encode64(util.Encrypt(util.Decode64(nombreRegistro), util.Decode64(claveServidor)))
 		u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
 
-		var aux = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+		var aux = util.Encode64(util.Encrypt([]byte(usernameRegistro), util.Decode64(claveServidor)))
 		for ok := true; ok; ok = strings.ContainsAny(aux, "/") {
-			aux = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+			aux = util.Encode64(util.Encrypt([]byte(usernameRegistro), util.Decode64(claveServidor)))
 		}
 		u.Username = aux
 
@@ -259,9 +270,40 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		gUsers[u.Username] = u
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
+		/*
+			_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
+			if ok {
+				response(w, false, "Usuario ya registrado", nil)
+				return
+			}
+			u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
+			u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+			fmt.Println("Username Sin: " + usernameRegistro)
+			fmt.Println("Username Encrypt: " + u.Username)
+			u.Salt = make([]byte, 16)                                                                                        // sal (16 bytes == 128 bits)
+			rand.Read(u.Salt)                                                                                                // la sal es aleatoria
+			u.Data = make(map[string]string)                                                                                 // reservamos mapa de datos de usuario
+			u.Data["private"] = util.Encode64(util.Encrypt(util.Decode64(privateKeyRegistro), util.Decode64(claveServidor))) // clave privada
+			u.Data["public"] = util.Encode64(util.Encrypt(util.Decode64(publicKeyRegistro), util.Decode64(claveServidor)))   // clave pública
+			u.Data["keyData"] = util.Encode64(util.Encrypt(util.Decode64(keyDataRegistro), util.Decode64(claveServidor)))
+			password := util.Decode64(passRegistro) // contraseña (keyLogin)
+			//u := user{}
+			u.Name = nombreRegistro
+			u.Email = emailRegistro
+			u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
+			//u.Username = usernameRegistro
+			u.Salt = make([]byte, 16)              // sal (16 bytes == 128 bits)
+			rand.Read(u.Salt)                      // la sal es aleatoria
+			u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
+			u.Data["private"] = privateKeyRegistro // clave privada
+			u.Data["public"] = publicKeyRegistro   // clave pública
+			u.Data["keyData"] = keyDataRegistro
+			password := util.Decode64(passRegistro) // contraseña (keyLogin)
+		*/
 	case "create":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -270,10 +312,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -325,12 +368,20 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				//fmt.Fprintln(f, texto)
 				f.WriteString(texto)
 				f.Close()
+				fi := fichero{}
+				fi.duenyo = u.Username
+				fi.contenido = texto
+				fi.usuarios = append(fi.usuarios, "")
+				fi.comentarios = append(fi.comentarios, "")
+				fi.Name = aux
+				gFicheros[fi.Name] = fi
 				w.WriteHeader(200)
 			}
 		}
 	case "subir":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -339,10 +390,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -388,21 +440,29 @@ func handler(w http.ResponseWriter, req *http.Request) {
 				f, err := os.Create(pathh + "/" + string(aux) + ".txt")
 
 				if err != nil {
-					fmt.Println("Disgustoooooooooooo")
+					//fmt.Println("Disgustoooooooooooo")
 					w.WriteHeader(201)
 					return
 				} else {
 					fmt.Fprintln(f, util.Encode64(util.Encrypt([]byte(text), util.Decode64(claveServidor))))
 					f.Close()
+					fi := fichero{}
+					fi.duenyo = u.Username
+					fi.contenido = util.Encode64(util.Encrypt([]byte(text), util.Decode64(claveServidor)))
+					fi.usuarios = append(fi.usuarios, "")
+					fi.comentarios = append(fi.comentarios, "")
+					fi.Name = aux
+					gFicheros[fi.Name] = fi
 					w.WriteHeader(200)
 				}
 
 			}
 		}
-
 	case "ver":
 		var comprobarUsuarioBool bool = false
+		var comprobarficheroBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -411,10 +471,11 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -460,6 +521,7 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 
 			if nombreFicheroCifrado == "" {
+				w.WriteHeader(203)
 				return
 			} else {
 				f, err := os.Open(path + "/" + nombreFicheroCifrado)
@@ -472,60 +534,196 @@ func handler(w http.ResponseWriter, req *http.Request) {
 						text += escan.Text()
 					}
 					f.Close()
+					/***Aqui*/
+					var fic = fichero{}
 
+					for name := range gFicheros {
+						//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+						var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+						fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+						fmt.Println("Variable LogIn: ", usLog)
+
+						if nom == string(util.Decode64(c)) {
+							//fmt.Println("\n Encuentra en el bucle")
+							fic = gFicheros[name]
+							comprobarficheroBool = true
+							break
+						}
+					}
+
+					if !comprobarficheroBool {
+						return
+					} else {
+						responseLectura(w, text, fic.usuarios, fic.comentarios)
+					}
+					/****/
 					//textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
 					//auxTexto := string(util.Decode64(textoSinCifrar))
-					response(w, true, text, nil)
+
 				}
 			}
 
 		}
 	case "compartir":
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
+
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
 			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
-			ud, ok := gUsers[req.Form.Get("usuario")]
-			if !ok {
+			var comprobarUsuarioBooll bool = false
+			var comprobarficheroBool bool = false
+			usLogg := req.Form.Get("usuario")
+			fmt.Println("\n Nombre del usuario destino: ", usLogg)
+
+			//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+			var ud = user{}
+
+			for name := range gUsers {
+				//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+				var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+				fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+				fmt.Println("Variable LogIn: ", usLogg)
+
+				if usLogg == string(util.Decode64(c)) {
+					//fmt.Println("\n Encuentra en el bucle")
+					ud = gUsers[name]
+					comprobarUsuarioBooll = true
+					break
+				}
+			}
+
+			if !comprobarUsuarioBooll {
+				//response(w, false, "Usuario inexistente", nil)
 				w.WriteHeader(203)
 				return
 			} else {
 				nom := req.Form.Get("NombreFichero")
-				path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
+				//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+				path := "./ServidorSDS/" + u.Username
 				_, erro := os.Stat(path)
+
 				if os.IsNotExist(erro) {
 					w.WriteHeader(205)
 					return
 				}
-				f, err := os.Open(path + "\\" + nom + ".txt")
+
+				listado, err := os.ReadDir(path)
 				if err != nil {
+					w.WriteHeader(211)
+					return
+				}
+
+				var nombreFicheroCifrado string
+
+				for i := 0; i < len(listado); i++ {
+					longitudNombre := len(listado[i].Name()) - 4
+					cadena := listado[i].Name()[0:longitudNombre]
+
+					aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+					//var aux2 = []byte(nom)
+					aux2 := string(util.Decode64(aux))
+
+					if nom == aux2 {
+						nombreFicheroCifrado = listado[i].Name()
+						break
+					}
+				}
+
+				if nombreFicheroCifrado == "" {
 					w.WriteHeader(206)
+					return
 				} else {
-					text := ""
-					escan := bufio.NewScanner(f)
-					for escan.Scan() {
-						text += escan.Text() + "\n"
-					}
-					f.Close()
-					path := "C:\\ServidorSDS"
-					_, erro := os.Stat(path)
-					if os.IsNotExist(erro) {
-						erro = os.Mkdir(path, 0755)
-					}
-					path += "\\" + string(util.Decode64(ud.Username))
-					_, ero := os.Stat(path)
-					if os.IsNotExist(ero) {
-						ero = os.Mkdir(path, 0755)
-					}
-					f, err := os.Create(path + "\\" + nom + ".txt")
+					f, err := os.Open(path + "/" + nombreFicheroCifrado)
 					if err != nil {
-						w.WriteHeader(201)
-						return
+						w.WriteHeader(210)
 					} else {
-						fmt.Fprintln(f, text)
+						text := ""
+						escan := bufio.NewScanner(f)
+						for escan.Scan() {
+							text += escan.Text()
+						}
 						f.Close()
+						/***Aqui*/
+						var fic = fichero{}
+
+						for name := range gFicheros {
+							//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+							var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+							fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+							fmt.Println("Variable LogIn: ", usLog)
+
+							if nom == string(util.Decode64(c)) {
+								//fmt.Println("\n Encuentra en el bucle")
+								fic = gFicheros[name]
+								comprobarficheroBool = true
+								break
+							}
+						}
+
+						if !comprobarficheroBool {
+							return
+						} else {
+							fic.usuarios = append(fic.usuarios, usLogg)
+							gFicheros[fic.Name] = fic
+							path := "./ServidorSDS"
+
+							_, erro := os.Stat(path)
+
+							if os.IsNotExist(erro) {
+								w.WriteHeader(404)
+								erro = os.Mkdir(path, 0755)
+							}
+							path += "/" + ud.Username
+							_, ero := os.Stat(path)
+							if os.IsNotExist(ero) {
+								w.WriteHeader(500)
+								ero = os.Mkdir(path, 0755)
+							}
+
+							//fmt.Println("NameFile: ", nameFile)
+							//aux := base64.StdEncoding.EncodeToString([]byte(nameFile))
+							f, err := os.Create(path + "/" + fic.Name + ".txt")
+
+							if err != nil {
+								w.WriteHeader(201)
+								fmt.Println("Error: ", path)
+								return
+							} else {
+								//fmt.Fprintln(f, texto)
+								f.WriteString(fic.contenido)
+								f.Close()
+								w.WriteHeader(200)
+							}
+							//responseLectura(w, text, fic.usuarios, fic.comentarios)
+						}
+						/****/
+						//textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
+						//auxTexto := string(util.Decode64(textoSinCifrar))
+
 					}
 				}
 			}
@@ -544,74 +742,15 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(200)
 			response(w, true, "Token Correcto", nil)
 		}
+	/*case "pedirPK":
+	clavePK := x509.MarshalPKCS1PublicKey(&KeysServer.PublicKey)
+	w.WriteHeader(200)
+	response(w, true, "PublicKey obtenida", clavePK)
+	*/
 	case "listar":
-		u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
-			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
-			return
-		} else {
-			path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
-			_, erro := os.Stat(path)
-			if os.IsNotExist(erro) {
-				w.WriteHeader(205)
-				return
-			}
-			listado, err := os.ReadDir(path)
-			if err != nil {
-				w.WriteHeader(211)
-				return
-			}
-			lista := "Tus ficheros son: \n"
-			for i := 0; i < len(listado); i++ {
-				lista += listado[i].Name() + "\n"
-			}
-			response(w, true, lista, nil)
-		}
-	case "descargar":
-		/*u, ok := gUsers[req.Form.Get("userName")] // ¿existe ya el usuario?
-		if !ok {
-			//response(w, false, "Usuario inexistente", nil)
-			w.WriteHeader(202)
-			return
-		} else {
-			nom := req.Form.Get("NombreFichero")
-			path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Username)))
-			_, erro := os.Stat(path)
-			if os.IsNotExist(erro) {
-				w.WriteHeader(205)
-				return
-			}
-			f, err := os.Open(path + "\\" + nom + ".txt")
-			if err != nil {
-				w.WriteHeader(206)
-				return
-			} else {
-				text := ""
-				escan := bufio.NewScanner(f)
-				for escan.Scan() {
-					text += escan.Text() + "\n"
-				}
-				f.Close()
-				path := req.Form.Get("Ubi")
-				_, erro := os.Stat(path)
-				if os.IsNotExist(erro) {
-					w.WriteHeader(204)
-					return
-				}
-				f, err := os.Create(path + "\\" + nom + ".txt")
-				if err != nil {
-					w.WriteHeader(201)
-					return
-				} else {
-					fmt.Fprintln(f, text)
-					f.Close()
-				}
-			}
-
-		}*/
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
 
 		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
@@ -620,10 +759,66 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			//fmt.Println("\n Variable del Decrypt: ", c)
-			//fmt.Println("Variable Usuario: ", usLog)
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
 
-			if usLog == c {
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
+			return
+		} else {
+			path := "./ServidorSDS/" + u.Username
+			_, erro := os.Stat(path)
+
+			if os.IsNotExist(erro) {
+				w.WriteHeader(205)
+				return
+			}
+
+			listado, err := os.ReadDir(path)
+			if err != nil {
+				w.WriteHeader(211)
+				return
+			}
+
+			var lista = "Tu lista de ficheros son: \n"
+			for i := 0; i < len(listado); i++ {
+				longitudNombre := len(listado[i].Name()) - 4
+				cadena := listado[i].Name()[0:longitudNombre]
+
+				aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+				//var aux2 = []byte(nom)
+				aux2 := string(util.Decode64(aux))
+				lista += aux2 + "\n"
+			}
+			response(w, true, lista, nil)
+		}
+	case "descargar":
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
+
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
 				u = gUsers[name]
 				comprobarUsuarioBool = true
 				break
@@ -690,6 +885,113 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			}
 
 		}
+	case "comentar":
+		var comprobarUsuarioBool bool = false
+		usLog := req.Form.Get("userName")
+		fmt.Println("\n Nombre del usuario: ", usLog)
+
+		//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+		//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
+		var u = user{}
+
+		for name := range gUsers {
+			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+			fmt.Println("Variable LogIn: ", usLog)
+
+			if usLog == string(util.Decode64(c)) {
+				//fmt.Println("\n Encuentra en el bucle")
+				u = gUsers[name]
+				comprobarUsuarioBool = true
+				break
+			}
+		}
+
+		if !comprobarUsuarioBool {
+			//response(w, false, "Usuario inexistente", nil)
+			w.WriteHeader(404)
+			response(w, false, "Usuario inexistente", nil)
+			return
+		} else {
+			nom := req.Form.Get("NombreFichero")
+			//path := "C:\\ServidorSDS\\" + string((util.Decode64(u.Name)))
+			path := "./ServidorSDS/" + u.Username
+			_, erro := os.Stat(path)
+
+			if os.IsNotExist(erro) {
+				w.WriteHeader(403)
+				return
+			}
+
+			listado, err := os.ReadDir(path)
+			if err != nil {
+				w.WriteHeader(211)
+				return
+			}
+
+			var nombreFicheroCifrado string
+
+			for i := 0; i < len(listado); i++ {
+				longitudNombre := len(listado[i].Name()) - 4
+				cadena := listado[i].Name()[0:longitudNombre]
+
+				aux := util.Encode64(util.Decrypt(util.Decode64(cadena), util.Decode64(claveServidor)))
+				//var aux2 = []byte(nom)
+				aux2 := string(util.Decode64(aux))
+
+				if nom == aux2 {
+					nombreFicheroCifrado = listado[i].Name()
+					break
+				}
+			}
+
+			if nombreFicheroCifrado == "" {
+				w.WriteHeader(201)
+				return
+			} else {
+				/*f, err := os.Open(path + "/" + nombreFicheroCifrado)
+				if err != nil {
+					w.WriteHeader(203)
+				} else {
+					text := ""
+					escan := bufio.NewScanner(f)
+					for escan.Scan() {
+						text += escan.Text()
+					}
+					f.Close()
+
+					//textoSinCifrar := util.Encode64(util.Decrypt(util.Decode64(text), util.Decode64(claveServidor)))
+					//auxTexto := string(util.Decode64(textoSinCifrar))
+					response(w, true, text, nil)
+				}*/
+				var comprobarficheroBool bool = false
+				var fic = fichero{}
+
+				for name := range gFicheros {
+					//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
+					var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
+					fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
+					fmt.Println("Variable LogIn: ", usLog)
+
+					if nom == string(util.Decode64(c)) {
+						//fmt.Println("\n Encuentra en el bucle")
+						fic = gFicheros[name]
+						comprobarficheroBool = true
+						break
+					}
+				}
+
+				if !comprobarficheroBool {
+					return
+				} else {
+					comentario := req.Form.Get("Comentario")
+					fic.comentarios = append(fic.comentarios, comentario)
+					gFicheros[fic.Name] = fic
+				}
+			}
+
+		}
 	default:
 		response(w, false, "Comando no implementado", nil)
 	}
@@ -704,6 +1006,18 @@ type Resp struct {
 	Msg   string // mensaje adicional
 	Token []byte // token de sesión para utilizar por el cliente
 }
+type LecturaFic struct {
+	Coments []string
+	Users   []string
+	Content string
+}
+
+func responseLectura(w io.Writer, contenido string, usuarios []string, comentarios []string) {
+	r := LecturaFic{Coments: comentarios, Users: usuarios, Content: contenido} // formateamos respuesta
+	rJSON, err := json.Marshal(&r)                                             // codificamos en JSON
+	chk(err)                                                                   // comprobamos error
+	w.Write(rJSON)                                                             // escribimos el JSON resultante
+}
 
 // función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
@@ -711,14 +1025,4 @@ func response(w io.Writer, ok bool, msg string, token []byte) {
 	rJSON, err := json.Marshal(&r)            // codificamos en JSON
 	chk(err)                                  // comprobamos error
 	w.Write(rJSON)                            // escribimos el JSON resultante
-}
-
-//Mis llamadas
-func registro(w http.ResponseWriter, req *http.Request) {
-
-	/*var usuario User1
-	json.NewDecoder(req.Body).Decode(&usuario)
-
-	fmt.Printf("\nNombre Usuario: %q", usuario.Nombre)
-	*/
 }

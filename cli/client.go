@@ -5,21 +5,17 @@ package cli
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"sdshttp/srv"
 	"sdshttp/util"
-	"strings"
 	"syscall"
 
 	"golang.org/x/term"
@@ -32,6 +28,14 @@ func chk(e error) {
 	}
 }
 
+type CurrentUser struct {
+	Username string `json:"userName"`
+	Token    []byte `json:"Token"`
+	KeyData  []byte `json:"KeyData"`
+}
+
+var usuarioActivo CurrentUser = CurrentUser{}
+
 type User struct {
 	Nombre     string `json:"nombre"`
 	Username   string `json:"userName"`
@@ -41,54 +45,8 @@ type User struct {
 	publicKey  string `json:"publicKey"`
 	privateKey string `json:"privateKey"`
 }
-type CurrentUser struct {
-	Username   string `json:"userName"`
-	Token      []byte `json:"Token"`
-	KeyData    []byte `json:"KeyData"`
-	privadaKey []byte `json:"privadaKey"`
-}
-
-var usuarioActivo CurrentUser = CurrentUser{}
 
 var UserNameGlobal string
-
-/***Empieza aqui***/
-// mensaje genérico (tanto para peticiones como respuestas)
-type msg map[string][]byte // mapa con índice de string y slice de bytes de contenido
-
-// función que hace un post al servidor y devuelve la respuesta
-func (m msg) post() (msg, error) {
-	/* creamos un cliente especial que no comprueba la validez de los certificados
-	esto es necesario por que usamos certificados autofirmados (para pruebas) */
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-
-	mBytes, err := json.Marshal(m) // serializamos el mensaje a JSON ([]byte)
-	chk(err)
-
-	// hacemos un post pasando un reader al json como body
-	r, err := client.Post("https://localhost:10443", "application/octet-stream", bytes.NewReader(mBytes))
-	chk(err)
-
-	// extraemos el mensaje de respuesta
-	rm := msg{}                            // creamos un mensaje para la respuesta
-	rmBytes, err := ioutil.ReadAll(r.Body) // leemos todo el body
-	chk(err)
-	err = json.Unmarshal(rmBytes, &rm) // deserializamos
-	chk(err)
-
-	// comprobamos el status del mensaje de respuesta
-	// (protocolo propio, no es el status de http)
-	if !strings.EqualFold(string(rm["status"]), "OK") {
-		err = errors.New("error en respuesta")
-	} else {
-		err = nil
-	}
-
-	return rm, err // devolvemos el mensaje de respuesta y el error (en su caso)
-}
 
 func login(client *http.Client) {
 	var usuario User = User{}
@@ -128,7 +86,6 @@ func login(client *http.Client) {
 				usuarioActivo.Username = usuario.Username
 				usuarioActivo.Token = respuesta.Token
 				usuarioActivo.KeyData = keyData
-				//usuarioActivo.privadaKey = []byte(respuesta.Msg)
 				//fmt.Println("\nTu TOKEN:", respuesta.Token)
 				//usuarioActivo.Token = util.Decode64(string(respuesta.Token))
 
@@ -202,7 +159,7 @@ func registro(client *http.Client) {
 	data.Set("nombre", util.Encode64(util.Encrypt(util.Decode64(usuario.Nombre), keyData)))
 	data.Set("username", usuario.Username)
 	data.Set("pass", usuario.Password)
-	data.Set("email", util.Encode64(util.Encrypt(util.Decode64(usuario.Email), keyData)))
+	data.Set("email", util.Encode64(util.Encrypt([]byte(usuario.Email), keyData)))
 	//data.Set("keyData", usuario.keyData)
 	data.Set("publicKey", usuario.publicKey)
 	data.Set("privateKey", usuario.privateKey)
@@ -219,6 +176,7 @@ func registro(client *http.Client) {
 	}
 	r.Body.Close()
 }
+
 func verificarLogIn(client *http.Client) bool {
 	var verificar bool = false
 	data := url.Values{}
@@ -242,6 +200,27 @@ func verificarLogIn(client *http.Client) bool {
 	r.Body.Close()
 	return verificar
 }
+
+/*
+func pedirClavePublica(client *http.Client) []byte {
+	var clave []byte
+	data := url.Values{}
+	data.Set("cmd", "pedirPK")
+	if !verificarLogIn(client) {
+		fmt.Println("\nAcceso denegado")
+		return clave
+	}
+	r, _ := client.PostForm("https://localhost:10443", data)
+	respuesta := srv.Resp{}
+	json.NewDecoder(r.Body).Decode(&respuesta)
+	if r.StatusCode == 200 {
+		fmt.Println("\nKey obtenida correctamente")
+		clave = respuesta.Token
+	}
+	r.Body.Close()
+	return clave
+}
+*/
 
 func crearFichero(client *http.Client) {
 	fmt.Print("Nombre Fichero: ")
@@ -272,6 +251,7 @@ func crearFichero(client *http.Client) {
 		}
 	}
 }
+
 func subirFichero(client *http.Client) {
 	/*
 		1) pasarle la ubicacion del archivo y el nombre
@@ -310,6 +290,7 @@ func subirFichero(client *http.Client) {
 		}
 	}
 }
+
 func listarFichero(client *http.Client) {
 	/*
 		1) buscar la carpeta del usuario == userName
@@ -318,7 +299,7 @@ func listarFichero(client *http.Client) {
 	*/
 	data := url.Values{}
 	data.Set("cmd", "listar")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
+	data.Set("userName", usuarioActivo.Username)
 	r, _ := client.PostForm("https://localhost:10443", data)
 
 	if r.StatusCode == 205 {
@@ -326,9 +307,10 @@ func listarFichero(client *http.Client) {
 	} else {
 		respuesta := srv.Resp{}
 		json.NewDecoder(r.Body).Decode(&respuesta)
-		fmt.Print(respuesta.Msg)
+		fmt.Println(respuesta.Msg)
 	}
 }
+
 func verFichero(client *http.Client) {
 	/*
 		1) metemos el nombre del fichero que queremos ver
@@ -350,24 +332,50 @@ func verFichero(client *http.Client) {
 		if r.StatusCode == 203 {
 			fmt.Println("No existe fichero con el nombre introducido")
 		} else {
-			respuesta := srv.Resp{}
+			respuesta := srv.LecturaFic{}
 			json.NewDecoder(r.Body).Decode(&respuesta)
-			textoCifrado := respuesta.Msg
+			textoCifrado := respuesta.Content
 			textoBien := util.Encode64(util.Decrypt(util.Decode64(textoCifrado), usuarioActivo.KeyData))
 			auxTexto := string(util.Decode64(textoBien))
-
 			fmt.Println("El contenido del fichero es: ", auxTexto)
+			//Coments
+			comentsCifrado := respuesta.Coments
+			fmt.Println("Los comentarios existentes: ")
+			var auxxTexto string
+			for _, c := range comentsCifrado {
+				if c == "" {
+					auxxTexto = ""
+				} else {
+					comentsBien := util.Encode64(util.Decrypt(util.Decode64(c), usuarioActivo.KeyData))
+					auxxTexto = string(util.Decode64(comentsBien))
+				}
+				fmt.Println(auxxTexto)
+			}
+			//users
+			usersCifrado := respuesta.Users
+			fmt.Println("Compartido con: ")
+			var auxxxTexto string
+			for _, u := range usersCifrado {
+				if u == "" {
+					auxxxTexto = ""
+				} else {
+					usersBien := util.Encode64(util.Decrypt(util.Decode64(u), usuarioActivo.KeyData))
+					auxxxTexto = string(util.Decode64(usersBien))
+				}
+				fmt.Println(auxxxTexto)
+			}
 		}
 	}
 	r.Body.Close()
 }
+
 func compartirFichero(client *http.Client) {
 	/*
 		1) pedimos el nombre del fichero que queremos compartir (comprobamos)
 		2) pedimos del usuario al que se lo queremos compartir (comprobamos)
 		3) copiamos el archivo desde el usuario origen al usuario destino
 	*/
-	/*fmt.Print("Nombre Fichero: ")
+	fmt.Print("Nombre Fichero: ")
 	var fichero string
 	fmt.Scanln(&fichero)
 	fmt.Print("UserName: ")
@@ -375,8 +383,8 @@ func compartirFichero(client *http.Client) {
 	fmt.Scanln(&usern)
 	data := url.Values{}
 	data.Set("cmd", "compartir")
-	data.Set("userName", util.Encode64([]byte(UserNameGlobal)))
-	data.Set("usuario", util.Encode64([]byte(usern)))
+	data.Set("userName", usuarioActivo.Username)
+	data.Set("usuario", usern)
 	data.Set("NombreFichero", fichero)
 
 	r, _ := client.PostForm("https://localhost:10443", data)
@@ -386,18 +394,17 @@ func compartirFichero(client *http.Client) {
 		if r.StatusCode == 206 {
 			fmt.Println("No existe fichero con el nombre introducido")
 		} else {
-			fmt.Println("Fichero copiado correctamente")
+			if r.StatusCode == 211 {
+				fmt.Println("No existe carpeta con tu nombre")
+			} else {
+				fmt.Println("Fichero copiado correctamente")
+			}
 		}
 	}
 	r.Body.Close()
-	*/fmt.Print("UserName: ")
-	var usern string
-	fmt.Scanln(&usern)
-	data := url.Values{}
-	data.Set("cmd", "compartir")
-	data.Set("userName", usuarioActivo.Username)
-	data.Set("usuario")
+
 }
+
 func comentar(client *http.Client) {
 	/*
 		hay que darle acceso al archivo de la carpeta del usuario origen
@@ -406,12 +413,39 @@ func comentar(client *http.Client) {
 		es bueno hacer un struct para controlar los archivos
 		struct: id fichero, contenido, usuarios compartidos, comentarios
 	*/
+	fmt.Print("Nombre Fichero: ")
+	var fichero string
+	fmt.Scanln(&fichero)
+	fmt.Print("Comentario: ")
+	var comen string
+	reader := bufio.NewReader(os.Stdin)
+	comen, _ = reader.ReadString('\n')
+
+	data := url.Values{}
+	data.Set("cmd", "comentar")
+	data.Set("userName", usuarioActivo.Username)
+	data.Set("NombreFichero", fichero)
+	data.Set("Comentario", util.Encode64(util.Encrypt([]byte(comen), usuarioActivo.KeyData)))
+
+	r, _ := client.PostForm("https://localhost:10443", data)
+	if r.StatusCode == 200 {
+		fmt.Println("Comentario guardado con exito")
+	} else {
+		if r.StatusCode == 201 {
+			fmt.Println("No se ha encontrado el fichero")
+		} else {
+			if r.StatusCode == 404 || r.StatusCode == 403 {
+				fmt.Println("No se ha podido encontrar directorio")
+			}
+		}
+	}
 }
+
 func descargar(client *http.Client) {
 	/*
-		1) pedimos el nombre del fichero (comprobamos dentro de la carpeta)
-		2) pedimos la ubicacion donde quiere copiar el archivo
-		3) copiamos el archivo en la ubicacion del usuario
+	   1) pedimos el nombre del fichero (comprobamos dentro de la carpeta)
+	   2) pedimos la ubicacion donde quiere copiar el archivo
+	   3) copiamos el archivo en la ubicacion del usuario
 	*/
 	fmt.Print("Nombre Fichero: ")
 	var fichero string
@@ -424,7 +458,7 @@ func descargar(client *http.Client) {
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
 
-	r, _ := client.PostForm("https://localhost:10443", data)
+	r, _ := client.PostForm("https://localhost:10443/", data)
 	if r.StatusCode == 205 {
 		fmt.Println("No existe su carpeta en el sevidor")
 	} else {
@@ -459,7 +493,6 @@ func descargar(client *http.Client) {
 		}
 	}
 	r.Body.Close()
-
 }
 
 func menuSecundario(client *http.Client) {
@@ -535,6 +568,7 @@ func menuInicio(client *http.Client) {
 			break
 		case 3:
 			salir = true
+			usuarioActivo = CurrentUser{}
 			break
 		default:
 			fmt.Println(" >>> Elige una de las opciones")

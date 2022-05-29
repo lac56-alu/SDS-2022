@@ -86,8 +86,6 @@ func login(client *http.Client) {
 				usuarioActivo.Username = usuario.Username
 				usuarioActivo.Token = respuesta.Token
 				usuarioActivo.KeyData = keyData
-				//fmt.Println("\nTu TOKEN:", respuesta.Token)
-				//usuarioActivo.Token = util.Decode64(string(respuesta.Token))
 
 				menuSecundario(client)
 			}
@@ -183,8 +181,6 @@ func verificarLogIn(client *http.Client) bool {
 	data.Set("cmd", "verificar")
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("token", util.Encode64(usuarioActivo.Token))
-	//fmt.Println("\nToken SIN Encode: ", usuarioActivo.Token)
-	//fmt.Println("\nToken CON Encode: ", util.Encode64(usuarioActivo.Token))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	respuesta := srv.Resp{}
@@ -200,30 +196,6 @@ func verificarLogIn(client *http.Client) bool {
 	r.Body.Close()
 	return verificar
 }
-
-/*
-func pedirClavePublica(client *http.Client) []byte {
-	var clave []byte
-	data := url.Values{}
-	data.Set("cmd", "pedirPK")
-	if !verificarLogIn(client) {
-		fmt.Println("\nAcceso denegado")
-		return clave
-	}
-
-	r, _ := client.PostForm("https://localhost:10443", data)
-	respuesta := srv.Resp{}
-	json.NewDecoder(r.Body).Decode(&respuesta)
-
-	if r.StatusCode == 200 {
-		fmt.Println("\nKey obtenida correctamente")
-		clave = respuesta.Token
-	}
-	r.Body.Close()
-
-	return clave
-}
-*/
 
 func crearFichero(client *http.Client) {
 	fmt.Print("Nombre Fichero: ")

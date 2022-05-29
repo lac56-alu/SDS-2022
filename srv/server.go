@@ -67,25 +67,17 @@ func ComprobarToken(us string, tk []byte) bool {
 	usLog := us
 	fmt.Println("\n Nombre del usuario: ", usLog)
 
-	//comprobarUsername := util.Encode64(util.Encrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
-	//u, ok := gUsers[comprobarUsername] // ¿existe ya el usuario?
 	var u = user{}
 
 	for name := range gUsers {
-		//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 		var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-		fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
-		fmt.Println("Variable LogIn: ", usLog)
 
 		if usLog == string(util.Decode64(c)) {
-			//fmt.Println("\n Encuentra en el bucle")
 			u = gUsers[name]
 			comprobarUsuarioBool = true
 			break
 		}
 	}
-	//fmt.Println("\nToken (u.token): ", u.Token)
-	//fmt.Println("\nToken (tk): ", tk)
 
 	if comprobarUsuarioBool {
 		if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
@@ -146,8 +138,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		for name := range gUsers {
 			//var opa = util.Encode64(util.Decrypt(util.Decode64(usLog), util.Decode64(claveServidor)))
 			var c = util.Encode64(util.Decrypt(util.Decode64(name), util.Decode64(claveServidor)))
-			fmt.Println("\n Variable del Decrypt: ", string(util.Decode64(c)))
-			fmt.Println("Variable LogIn: ", usLog)
 
 			if usLog == string(util.Decode64(c)) {
 				//fmt.Println("\n Encuentra en el bucle")
@@ -163,11 +153,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 			response(w, false, "Usuario inexistente", nil)
 			return
 		} else {
-			/*
-				fmt.Println("\n Entra en el else, varible true")
-				salt := util.Decrypt(u.Salt, util.Decode64(claveServidor))
-				fmt.Println("\n Salt LogIn: ", salt)
-			*/
 			password := util.Decode64(req.Form.Get("pass")) // obtenemos la contraseña (keyLogin)
 			hash := argon2.IDKey([]byte(password), u.Salt, 1, 64*1024, 4, 32)
 
@@ -261,40 +246,6 @@ func handler(w http.ResponseWriter, req *http.Request) {
 		gUsers[u.Username] = u
 		response(w, true, string("Te has registrado correctamente"), u.Token)
 
-		/*
-			_, ok := gUsers[usernameRegistro] // ¿existe ya el usuario?
-			if ok {
-				response(w, false, "Usuario ya registrado", nil)
-				return
-			}
-
-			u.Email = util.Encode64(util.Encrypt(util.Decode64(emailRegistro), util.Decode64(claveServidor)))
-			u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
-			fmt.Println("Username Sin: " + usernameRegistro)
-			fmt.Println("Username Encrypt: " + u.Username)
-
-			u.Salt = make([]byte, 16)                                                                                        // sal (16 bytes == 128 bits)
-			rand.Read(u.Salt)                                                                                                // la sal es aleatoria
-			u.Data = make(map[string]string)                                                                                 // reservamos mapa de datos de usuario
-			u.Data["private"] = util.Encode64(util.Encrypt(util.Decode64(privateKeyRegistro), util.Decode64(claveServidor))) // clave privada
-			u.Data["public"] = util.Encode64(util.Encrypt(util.Decode64(publicKeyRegistro), util.Decode64(claveServidor)))   // clave pública
-			u.Data["keyData"] = util.Encode64(util.Encrypt(util.Decode64(keyDataRegistro), util.Decode64(claveServidor)))
-			password := util.Decode64(passRegistro) // contraseña (keyLogin)
-
-
-			//u := user{}
-			u.Name = nombreRegistro
-			u.Email = emailRegistro
-			u.Username = util.Encode64(util.Encrypt(util.Decode64(usernameRegistro), util.Decode64(claveServidor)))
-			//u.Username = usernameRegistro
-			u.Salt = make([]byte, 16)              // sal (16 bytes == 128 bits)
-			rand.Read(u.Salt)                      // la sal es aleatoria
-			u.Data = make(map[string]string)       // reservamos mapa de datos de usuario
-			u.Data["private"] = privateKeyRegistro // clave privada
-			u.Data["public"] = publicKeyRegistro   // clave pública
-			u.Data["keyData"] = keyDataRegistro
-			password := util.Decode64(passRegistro) // contraseña (keyLogin)
-		*/
 	case "create":
 		var comprobarUsuarioBool bool = false
 		usLog := req.Form.Get("userName")

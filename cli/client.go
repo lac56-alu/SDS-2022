@@ -232,34 +232,48 @@ func subirFichero(client *http.Client) {
 		2) copiamos tanto el nombre como el fichero como el contenido en un fichero
 		en el servidor
 	*/
+
 	fmt.Print("Nombre Fichero: ")
 	var fichero string
 	fmt.Scanln(&fichero)
 	fmt.Print("Ubicacion del fichero: ")
 	var ubi string
+	var text string
 	fmt.Scanln(&ubi)
+	path := ubi
+	_, erro := os.Stat(path)
+	if os.IsNotExist(erro) {
+		fmt.Println("No existe la ubicacion introducida")
+		return
+	}
+	f, err := os.Open(path + "\\" + fichero + ".txt")
+	if err != nil {
+		fmt.Println("No ha encontrado el fichero para subir")
+		return
+	} else {
+		text = ""
+		escan := bufio.NewScanner(f)
+		for escan.Scan() {
+			text += escan.Text()
+		}
+		f.Close()
+	}
 
 	data := url.Values{}
-	data.Set("cmd", "subir")
+	data.Set("cmd", "create")
 	data.Set("userName", usuarioActivo.Username)
 	data.Set("NombreFichero", fichero)
-	data.Set("Ubicacion", ubi)
+	data.Set("Texto", util.Encode64(util.Encrypt([]byte(text), usuarioActivo.KeyData)))
 
 	r, _ := client.PostForm("https://localhost:10443", data)
 	if r.StatusCode == 200 {
-		fmt.Println("Fichero guardado con exito en el servidor")
+		fmt.Println("Fichero guardado con exito")
 	} else {
-		if r.StatusCode == 203 {
-			fmt.Println("No ha encontrado el fichero para subir")
+		if r.StatusCode == 201 {
+			fmt.Println("No ha sido posible crear el fichero")
 		} else {
-			if r.StatusCode == 205 {
-				fmt.Println("No existe la ubicacion introducida")
-			} else {
-				if r.StatusCode == 204 {
-					fmt.Println("No se ha podido leer fichero introducido")
-				} else {
-					fmt.Println("No se ha podido subir fichero al servidor")
-				}
+			if r.StatusCode == 404 {
+				fmt.Println("No se ha encontrado al usuario")
 			}
 		}
 	}
